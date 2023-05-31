@@ -1,6 +1,6 @@
 from django.urls import path, include
 from .views import MyTokenObtainPairView, LogoutView
-from .views import ClinicRoleSwitchAuth, AddClinicView, ClinicPaginationWithFilterView, StaffRelationshipManagementView
+from .views import ClinicManagementView, StaffRelationshipManagementView
 from .views import DrugInventoryManagement, AppointmentManagement
 from .views import PingView, LoginView, SignupView, ForgotPasswordView, ResetPasswordView, UserRetrieveUpdateAPIView
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -21,9 +21,9 @@ urlpatterns = [
     path('forgot-password/' , ForgotPasswordView.as_view(), name="forget-password"),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     
-    path('clinic/add/', AddClinicView.as_view(), name="add-clinic"),
-    path('clinic/list/', ClinicPaginationWithFilterView.as_view(), name="view-clinic"),
-    path('clinic/login/', ClinicRoleSwitchAuth.as_view(), name='login-clinic'),
+    path('clinic/add/', ClinicManagementView.as_view(), name="add-clinic"),
+    path('clinic/list/', ClinicManagementView.as_view(), name="view-clinic"),
+    path('clinic/login/', LoginView.as_view(), name='login-clinic'),
     path('clinic/allusers/', StaffRelationshipManagementView.as_view(), name='srm'),
     path('clinic/allusers/add/', StaffRelationshipManagementView.as_view(), name='srm-add'),
     

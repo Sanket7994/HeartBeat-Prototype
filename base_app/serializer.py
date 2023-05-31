@@ -7,6 +7,7 @@ from .models import CustomUser, Clinic, Drug, ClinicMember, PatientAppointment
 
 class CustomSerializer(serializers.ModelSerializer):
     created_at = serializers.ReadOnlyField()
+
     class Meta:
         model = CustomUser
         fields = (
@@ -44,7 +45,8 @@ class ClinicSerializer(serializers.ModelSerializer):
         model = Clinic
         fields = (
             "clinic_id",
-            "clinic_name",
+            "user",
+            "contact_number",
             "email",
             "contact_number",
             "address",
@@ -63,6 +65,7 @@ class ClinicStaffSerializer(serializers.ModelSerializer):
         model = ClinicMember
         fields = (
             "staff_id",
+            "clinic_name",
             "first_name",
             "last_name",
             "email",
@@ -79,8 +82,10 @@ class AppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = PatientAppointment
         fields = [
+            "clinic_name",
             "recipient",
-            "patient_full_name",
+            "patient_first_name",
+            "patient_last_name",
             "contact_number",
             "email",
             "appointment_date",

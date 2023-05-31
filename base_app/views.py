@@ -156,7 +156,6 @@ class LoginView(APIView):
                 refresh_token.set_exp(lifetime=timedelta(days=1))
             # Output dictionary
             user_details = {
-                "name": f"{user.first_name}{user.last_name}",
                 "refresh": str(refresh_token),
                 "access": str(refresh_token.access_token),
                 "user_id": str(user.id),
@@ -190,13 +189,16 @@ class LogoutView(APIView):
 
     def post(self, request):
         try:
-            # Delete the user's authentication token
-            request.user.auth_token.delete()
+            refresh_token = request.data["refresh_token"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+
             return Response(
-                data={"message": "Logout successful"}, status=status.HTTP_200_OK
+                {"message": "Logged out successfully"},
+                status=status.HTTP_205_RESET_CONTENT,
             )
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # User Account Forgot Password API
@@ -298,6 +300,7 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
             "first_name": request.data.get("first_name"),
             "last_name": request.data.get("last_name"),
             "email": request.data.get("email"),
+            "avatar": request.data.get("avatar"),
         }
         serializer = CustomSerializer(user_data, data=data, partial=True)
         try:
@@ -335,44 +338,20 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
 ###############################################################################################
 
 
-# Switch Role to Clinic Management by logging in through clinic email address
-class ClinicRoleSwitchAuth(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        try:
-            email = request.data.get("email")
-            # Rain check from user database
-            try:
-                user = Clinic.objects.get(email=email)
-            except Clinic.DoesNotExist:
-                return Response(
-                    {"message": "Invalid Clinic Email address."},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
-            user_logged_in = Signal()
-            user_logged_in.send(sender=user.__class__, request=request, user=user)
-            return Response(
-                {"message": "Switched Role to Clinic Management"},
-                status=status.HTTP_202_ACCEPTED,
-            )
-
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-# Add clinic data
-class AddClinicView(APIView):
+# CRUD OPERATION FOR CLINIC
+class ClinicManagementView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
         data = {
             "clinic_name": request.data.get("clinic_name"),
-            "clinic_url": request.data.get("clinic_url"),
-            "mobile_number": request.data.get("mobile_number"),
+            "contact_number": request.data.get("mobile_number"),
             "address": request.data.get("address"),
+            "city": request.data.get("city"),
             "country": request.data.get("country"),
             "email": request.data.get("email"),
+            "status": request.data.get("status"),
+            "user": request.get.user,
         }
 
         serializer = ClinicSerializer(data=data)
@@ -382,42 +361,44 @@ class AddClinicView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-# View clinic data
-class ClinicPaginationWithFilterView(APIView):
-    permission_classes = [permissions.AllowAny]
-
     def get(self, request, *args, **kwargs):
         try:
-            clinicData_queryset = Clinic.objects.all().order_by("-created_at").values()
+            queryset = Clinic.objects.all().order_by("-created_at")
 
-            # Filter by country if provided in the request query parameters
-            country = self.request.GET.get("country")
-            if country and country != "null":
-                clinicData_queryset = clinicData_queryset.filter(country=country)
+            # Filter by query parameters
+            clinic_name = self.request.GET.get("clinic_name", None)
+            email = self.request.GET.get("email", None)
+            country = self.request.GET.get("country", None)
+            city = self.request.GET.get("city", None)
 
-            # Applying pagination
-            paginator = Paginator(clinicData_queryset, 10)
+            if clinic_name:
+                queryset = queryset.filter(clinic_name__icontains=clinic_name)
+            if email:
+                queryset = queryset.filter(email=email)
+            if country:
+                queryset = queryset.filter(country=country)
+            if city:
+                queryset = queryset.filter(city=city)
+
+            # Pagination
+            paginator = Paginator(queryset, 10)
             page_number = self.request.GET.get("page")
             page_obj = paginator.get_page(page_number)
-            serializer = ClinicSerializer(page_obj.object_list, many=True)
+            serializer = ClinicSerializer(page_obj, many=True)
 
-            # result dictionary
+            # Result dictionary
             payload = {
                 "Page": {
-                    "totalRecords": len(clinicData_queryset),
+                    "totalRecords": queryset.count(),
                     "current": page_obj.number,
                     "next": page_obj.has_next(),
                     "previous": page_obj.has_previous(),
-                    "totalPages": page_obj.paginator.num_pages,
+                    "totalPages": paginator.num_pages,
                 },
                 "Result": serializer.data,
             }
 
-            return Response(
-                payload,
-                status=status.HTTP_200_OK,
-            )
+            return Response(payload, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -433,9 +414,11 @@ class StaffRelationshipManagementView(APIView):
     def post(self, request, *args, **kwargs):
         data = {
             "clinic_name": request.data.get("clinic_name"),
-            "full_name": request.data.get("full_name"),
+            "first_name": request.data.get("first_name"),
+            "last_name": request.data.get("last_name"),
             "designation": request.data.get("designation"),
             "email": request.data.get("email"),
+            "status": request.data.get("status"),
         }
 
         serializer = ClinicStaffSerializer(data=data)
@@ -448,18 +431,31 @@ class StaffRelationshipManagementView(APIView):
     # LIST VIEW
     def get(self, request, *args, **kwargs):
         try:
-            staff_queryset = ClinicMember.objects.all().order_by("-created_at").values()
-        
+            staff_queryset = ClinicMember.objects.all().order_by("-created_at")
+
+            # Filter by query parameters
+            clinic_name = self.request.GET.get('clinic_name', None)
+            first_name = self.request.GET.get('first_name', None)
+            designation = self.request.GET.get('designation', None)
+            email = self.request.GET.get('email', None)
+
+            if clinic_name:
+                queryset = queryset.filter(clinic_name__icontains=clinic_name)
+            if first_name:
+                queryset = queryset.filter(first_name=first_name)
+            if designation:
+                queryset = queryset.filter(designation=designation)
+            if email:
+                queryset = queryset.filter(email=email)
+                
             # Applying pagination
             paginator = Paginator(staff_queryset, 10)
-            page_number = request.GET.get(
+            page_number = self.request.GET.get(
                 "page"
-            )  # Use GET instead of data to retrieve the page number
+            )  
+            # Use GET instead of data to retrieve the page number
             page_obj = paginator.get_page(page_number)
-
-            serializer = ClinicStaffSerializer(
-                page_obj, many=True
-            )  # Serialize the queryset
+            serializer = ClinicStaffSerializer(page_obj, many=True)
 
             # result dictionary
             payload = {
@@ -611,14 +607,16 @@ class AppointmentManagement(APIView):
     # Create appointment
     def post(self, request):
         data = {
+            "clinic_name": request.data.get("clinic_name"),
             "recipient": request.data.get("recipient"),
-            "patient_full_name": request.data.get("patient_full_name"),
+            "patient_first_name": request.data.get("patient_first_name"),
+            "patient_last_name": request.data.get("patient_last_name"),
             "contact_number": request.data.get("contact_number"),
             "email": request.data.get("email"),
             "appointment_date": request.data.get("appointment_date"),
             "appointment_slot": request.data.get("appointment_slot"),
+            "status": request.data.get("status"),
         }
-
 
         serializer = AppointmentSerializer(data=data)
         if serializer.is_valid():
@@ -631,7 +629,7 @@ class AppointmentManagement(APIView):
     def get(self, request, *args, **kwargs):
         try:
             appointment_queryset = (
-                PatientAppointment.objects.all().order_by("-created_at").values()
+                PatientAppointment.objects.all().order_by("-created_at")
             )
 
             # Applying pagination
