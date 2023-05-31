@@ -1,0 +1,4 @@
+
+sting = ""
+
+print(type(sting))
