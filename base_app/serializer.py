@@ -45,6 +45,7 @@ class ClinicSerializer(serializers.ModelSerializer):
         model = Clinic
         fields = (
             "clinic_id",
+            "clinic_name",
             "user",
             "contact_number",
             "email",

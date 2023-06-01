@@ -14,7 +14,7 @@ from .emails import (
     send_user_profile_delete_notification,
 )
 from .serializer import ForgotPasswordSerializer, ResetPasswordSerializer
-from .permissions import IsClinicManagement, IsSiteAdmin
+from .filter import filter_queryset
 
 # External REST libraries and models
 
@@ -35,12 +35,7 @@ from rest_framework_simplejwt.token_blacklist.models import (
 # External Django libraries and modules
 from datetime import timedelta
 from django.dispatch import Signal
-from django.views.decorators.csrf import csrf_exempt
-from django.db.models import CharField, Value
-from django.db.models.functions import Concat
 from django.core.paginator import Paginator, EmptyPage
-from django.core.exceptions import ObjectDoesNotExist
-from django.utils.decorators import method_decorator
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.decorators import login_required
@@ -339,8 +334,10 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
 
 
 # CRUD OPERATION FOR CLINIC
-class ClinicManagementView(APIView):
-    permission_classes = [permissions.AllowAny]
+class ClinicListView(APIView):
+    permission_classes = [
+        permissions.AllowAny,
+    ]
 
     def post(self, request, *args, **kwargs):
         data = {
@@ -351,7 +348,7 @@ class ClinicManagementView(APIView):
             "country": request.data.get("country"),
             "email": request.data.get("email"),
             "status": request.data.get("status"),
-            "user": request.get.user,
+            "user": request.user.id,
         }
 
         serializer = ClinicSerializer(data=data)
@@ -363,9 +360,10 @@ class ClinicManagementView(APIView):
 
     def get(self, request, *args, **kwargs):
         try:
-            queryset = Clinic.objects.all().order_by("-created_at")
+            queryset = Clinic.objects.all().order_by("-created_at").values()
 
             # Filter by query parameters
+            clinic_id = self.request.GET.get("clinic_id", None)
             clinic_name = self.request.GET.get("clinic_name", None)
             email = self.request.GET.get("email", None)
             country = self.request.GET.get("country", None)
@@ -375,38 +373,46 @@ class ClinicManagementView(APIView):
                 queryset = queryset.filter(clinic_name__icontains=clinic_name)
             if email:
                 queryset = queryset.filter(email=email)
+            if clinic_id:
+                queryset = queryset.filter(clinic_id=clinic_id)
             if country:
                 queryset = queryset.filter(country=country)
             if city:
                 queryset = queryset.filter(city=city)
 
-            # Pagination
-            paginator = Paginator(queryset, 10)
+            # Applying pagination
+            set_limit = self.request.GET.get("limit")
+            paginator = Paginator(queryset, set_limit)
             page_number = self.request.GET.get("page")
+
+            # Use GET instead of data to retrieve the page number
             page_obj = paginator.get_page(page_number)
             serializer = ClinicSerializer(page_obj, many=True)
 
-            # Result dictionary
+            # result dictionary
             payload = {
                 "Page": {
                     "totalRecords": queryset.count(),
                     "current": page_obj.number,
                     "next": page_obj.has_next(),
                     "previous": page_obj.has_previous(),
-                    "totalPages": paginator.num_pages,
+                    "totalPages": page_obj.paginator.num_pages,
                 },
                 "Result": serializer.data,
             }
 
-            return Response(payload, status=status.HTTP_200_OK)
+            return Response(
+                payload,
+                status=status.HTTP_200_OK,
+            )
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 ############################################################################################################################
+
+
 # CRUD FOR CLINIC STAFF
-
-
 class StaffRelationshipManagementView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -431,28 +437,30 @@ class StaffRelationshipManagementView(APIView):
     # LIST VIEW
     def get(self, request, *args, **kwargs):
         try:
-            staff_queryset = ClinicMember.objects.all().order_by("-created_at")
+            queryset = ClinicMember.objects.all().order_by("-created_at")
 
             # Filter by query parameters
-            clinic_name = self.request.GET.get('clinic_name', None)
-            first_name = self.request.GET.get('first_name', None)
-            designation = self.request.GET.get('designation', None)
-            email = self.request.GET.get('email', None)
+            clinic_name = self.request.GET.get("clinic_name", None)
+            first_name = self.request.GET.get("first_name", None)
+            designation = self.request.GET.get("designation", None)
+            email = self.request.GET.get("email", None)
+            clinic_id = self.request.GET.get("clinic_id", None)
 
             if clinic_name:
-                queryset = queryset.filter(clinic_name__icontains=clinic_name)
+                queryset = queryset.filter(clinic_name=clinic_name)
             if first_name:
                 queryset = queryset.filter(first_name=first_name)
             if designation:
                 queryset = queryset.filter(designation=designation)
             if email:
                 queryset = queryset.filter(email=email)
-                
+            if clinic_id:
+                queryset = queryset.filter(clinic_id=clinic_id)
+
             # Applying pagination
-            paginator = Paginator(staff_queryset, 10)
-            page_number = self.request.GET.get(
-                "page"
-            )  
+            set_limit = self.request.GET.get("limit")
+            paginator = Paginator(queryset, set_limit)
+            page_number = self.request.GET.get("page")
             # Use GET instead of data to retrieve the page number
             page_obj = paginator.get_page(page_number)
             serializer = ClinicStaffSerializer(page_obj, many=True)
@@ -460,7 +468,7 @@ class StaffRelationshipManagementView(APIView):
             # result dictionary
             payload = {
                 "Page": {
-                    "totalRecords": staff_queryset.count(),  # Use count() instead of len()
+                    "totalRecords": queryset.count(),  # Use count() instead of len()
                     "current": page_obj.number,
                     "next": page_obj.has_next(),
                     "previous": page_obj.has_previous(),
@@ -534,15 +542,16 @@ class DrugInventoryManagement(APIView):
     # View Drug information List
     def get(self, request, *args, **kwargs):
         try:
-            drugData_queryset = (
+            queryset = (
                 Drug.objects.filter(user=request.user.id)
                 .order_by("-created_at")
                 .values()
             )
 
             # Applying pagination
-            paginator = Paginator(drugData_queryset, 10)
-            page_number = request.data.get("page")
+            set_limit = self.request.GET.get("limit")
+            paginator = Paginator(queryset, set_limit)
+            page_number = self.request.data.get("page")
 
             page_obj = paginator.get_page(page_number)
             serializer = DrugSerializer(page_obj.object_list, many=True)
@@ -550,7 +559,7 @@ class DrugInventoryManagement(APIView):
             # result dictionary
             payload = {
                 "Page": {
-                    "totalRecords": len(drugData_queryset),
+                    "totalRecords": queryset.count(),
                     "current": page_obj.number,
                     "next": page_obj.has_next(),
                     "previous": page_obj.has_previous(),
@@ -628,20 +637,41 @@ class AppointmentManagement(APIView):
     # View appointment List
     def get(self, request, *args, **kwargs):
         try:
-            appointment_queryset = (
-                PatientAppointment.objects.all().order_by("-created_at")
-            )
+            queryset = PatientAppointment.objects.all().order_by("-created_at")
+
+            # filter and Search function for list
+            filter_params = {
+                "clinic_name": self.request.GET.get("clinic_name"),
+                "patient_first_name": self.request.GET.get("patient_first_name"),
+                "patient_last_name": self.request.GET.get("patient_last_name"),
+                "recipient": self.request.GET.get("recipient"),
+                "email": self.request.GET.get("email"),
+                "appointment_date": self.request.GET.get("appointment_date"),
+                "appointment_slot": self.request.GET.get("appointment_slot"),
+                "status": self.request.GET.get("status"),
+            }
+            # Parsing key and value into conditional filter
+            filters = {
+                field: value
+                for field, value in filter_params.items()
+                if value is not None
+            }
+
+            if filters:
+                queryset = queryset.filter(**filters)
 
             # Applying pagination
-            paginator = Paginator(appointment_queryset, 10)
-            page_number = request.data.get("page")
+            set_limit = self.request.GET.get("limit")
+            paginator = Paginator(queryset, set_limit)
+            page_number = self.request.GET.get("page")
+            # Use GET instead of data to retrieve the page number
             page_obj = paginator.get_page(page_number)
-            serializer = AppointmentSerializer(page_obj.object_list, many=True)
+            serializer = AppointmentSerializer(page_obj, many=True)
 
             # result dictionary
             payload = {
                 "Page": {
-                    "totalRecords": len(appointment_queryset),
+                    "totalRecords": queryset.count(),
                     "current": page_obj.number,
                     "next": page_obj.has_next(),
                     "previous": page_obj.has_previous(),

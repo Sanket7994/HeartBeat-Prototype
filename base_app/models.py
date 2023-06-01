@@ -120,7 +120,6 @@ class Clinic(models.Model):
 
     clinic_id = models.CharField(
         primary_key=True,
-        default=str(uuid.uuid4().hex[:10].upper()),
         max_length=50,
         editable=False,
         unique=True,
@@ -139,6 +138,17 @@ class Clinic(models.Model):
     )
     last_updated = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.clinic_id:
+            while True:
+                # Generate a new unique ID
+                new_clinic_id = str(uuid.uuid4().hex[:10].upper())
+                # Check if the generated ID already exists in the database
+                if not Clinic.objects.filter(clinic_id=new_clinic_id).exists():
+                    self.clinic_id = new_clinic_id
+                    break
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.clinic_name
@@ -159,7 +169,6 @@ class ClinicMember(models.Model):
 
     staff_id = models.CharField(
         primary_key=True,
-        default=str(uuid.uuid4().hex[:8].upper()),
         max_length=50,
         editable=False,
         unique=True,
@@ -176,6 +185,17 @@ class ClinicMember(models.Model):
     )
     last_updated = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
+        
+    def save(self, *args, **kwargs):
+        if not self.staff_id:
+            while True:
+                # Generate a new unique ID
+                new_staff_id = str(uuid.uuid4().hex[:10].upper())
+                # Check if the generated ID already exists in the database
+                if not Clinic.objects.filter(staff_id=new_staff_id).exists():
+                    self.staff_id = new_staff_id
+                    break
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
@@ -189,7 +209,6 @@ class PatientAppointment(models.Model):
 
     appointment_id = models.CharField(
         primary_key=True,
-        default=str(uuid.uuid4().hex[:10].upper()),
         max_length=50,
         editable=False,
         unique=True,
@@ -209,6 +228,20 @@ class PatientAppointment(models.Model):
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+    def save(self, *args, **kwargs):
+        if not self.appointment_id:
+            while True:
+                # Generate a new unique ID
+                new_appointment_id = str(uuid.uuid4().hex[:10].upper())
+                # Check if the generated ID already exists in the database
+                if not PatientAppointment.objects.filter(
+                    appointment_id=new_appointment_id
+                ).exists():
+                    self.appointment_id = new_appointment_id
+                    break
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.appointment_id
