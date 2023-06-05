@@ -627,6 +627,7 @@ class AppointmentManagement(APIView):
     def post(self, request):
         # Retrieve the primary key values of the procedures
         procedure_ids = request.data.get("procedures", [])
+        print(procedure_ids)
 
         data = {
             "clinic_name": request.data.get("clinic_name"),
