@@ -1,5 +1,12 @@
-from rest_framework import serializers
-from .models import CustomUser, Clinic, Drug, ClinicMember, PatientAppointment
+from rest_framework import fields, serializers
+from .models import (
+    CustomUser,
+    Clinic,
+    Drug,
+    ClinicMember,
+    PatientAppointment,
+    MedicalProcedure,
+)
 
 # To convert the Model object to an API-appropriate format like JSON,
 # Django REST framework uses the ModelSerializer class to convert any model to serialized JSON objects:
@@ -76,24 +83,22 @@ class ClinicStaffSerializer(serializers.ModelSerializer):
         )
 
 
+class MedicalProcedureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicalProcedure
+        fields = "__all__"
+
+
 # Appointment Information
 class AppointmentSerializer(serializers.ModelSerializer):
+    procedures = serializers.PrimaryKeyRelatedField(
+        queryset=MedicalProcedure.objects.all(), many=True
+    )
     created_at = serializers.ReadOnlyField()
 
     class Meta:
         model = PatientAppointment
-        fields = [
-            "clinic_name",
-            "recipient",
-            "patient_first_name",
-            "patient_last_name",
-            "contact_number",
-            "email",
-            "appointment_date",
-            "appointment_slot",
-            "status",
-            "created_at",
-        ]
+        fields = "__all__"
 
 
 # Drug Information

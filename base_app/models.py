@@ -185,7 +185,7 @@ class ClinicMember(models.Model):
     )
     last_updated = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
-        
+
     def save(self, *args, **kwargs):
         if not self.staff_id:
             while True:
@@ -201,8 +201,37 @@ class ClinicMember(models.Model):
         return f"{self.first_name} {self.last_name}"
 
 
-# Add Appointment information
+# Medical procedures choice model
+class MedicalProcedure(models.Model):
+    PROCEDURE_CHOICES = [
+        ("MEDICAL_EXAMINATION", "Medical Examination"),
+        ("ROUTINE_CHECK_UP", "Routine Check-up"),
+        ("RESULT_ANALYSIS", "Result Analysis"),
+        ("BLOOD_TESTS", "Blood Tests"),
+        ("X_RAY", "X-ray"),
+        ("ULTRASOUND", "Ultrasound"),
+        ("VACCINATIONS", "Vaccinations"),
+        ("BIOPSY", "Biopsy"),
+        ("SURGERY", "Surgery"),
+        ("PHYSICAL_THERAPY", "Physical Therapy"),
+        ("ALLERGY_TESTING", "Allergy Testing"),
+        ("HEARING_TEST", "Hearing Test"),
+        ("VISION_TEST", "Vision Test"),
+        ("CARDIAC_STRESS_TEST", "Cardiac Stress Test"),
+        ("ORGAN_DONATION", "Organ Donation"),
+        ("CONSULTATION", "Consultation"),
+    ]
+
+    procedure = models.CharField(max_length=100, choices=PROCEDURE_CHOICES)
+
+
+
 class PatientAppointment(models.Model):
+    class Gender(models.TextChoices):
+        MALE = ("MALE", "Male")
+        FEMALE = ("FEMALE", "Female")
+        UNDISCLOSED = ("UNDISCLOSED", "Undisclosed")
+
     def validate_date(value):
         if value < timezone.now().date():
             raise ValidationError(_("Invalid date."))
@@ -213,12 +242,28 @@ class PatientAppointment(models.Model):
         editable=False,
         unique=True,
     )
-    clinic_name = models.ForeignKey(Clinic, on_delete=models.SET_NULL, null=True)
-    recipient = models.ForeignKey(ClinicMember, on_delete=models.SET_NULL, null=True)
+    clinic_name = models.ForeignKey(
+        Clinic, on_delete=models.SET_NULL, null=True, related_name="main_clinic_name"
+    )
+    relatedDepartment = models.CharField(max_length=100, blank=True, null=True)
+    relatedRecipient = models.ForeignKey(
+        ClinicMember,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="recipient_name",
+    )
     patient_first_name = models.CharField(max_length=150)
     patient_last_name = models.CharField(max_length=150, null=False, blank=False)
+    gender = models.CharField(
+        max_length=100, choices=Gender.choices, default=None, null=True
+    )
     email = models.EmailField(blank=True, null=True)
     contact_number = models.CharField(max_length=50, blank=True, null=True)
+    recurring_patient = models.BooleanField(default=False)
+    procedures = models.ManyToManyField(
+        MedicalProcedure,
+        blank=True,
+    )
     appointment_date = models.DateField(
         validators=[validate_date],
         default=timezone.now,
@@ -228,7 +273,6 @@ class PatientAppointment(models.Model):
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
     created_at = models.DateTimeField(auto_now_add=True)
-
 
     def save(self, *args, **kwargs):
         if not self.appointment_id:
@@ -241,7 +285,6 @@ class PatientAppointment(models.Model):
                 ).exists():
                     self.appointment_id = new_appointment_id
                     break
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.appointment_id

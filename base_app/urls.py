@@ -29,6 +29,8 @@ urlpatterns = [
     
     path('clinic/scheduler/appointments/create/', AppointmentManagement.as_view(), name='new-appointment'),
     path('clinic/scheduler/appointments/view/', AppointmentManagement.as_view(), name='view-appointment'),
+    path('clinic/scheduler/appointments/update/<str:appointment_id>/', AppointmentManagement.as_view(), name='update-appointment'),
+    path('clinic/scheduler/appointments/delete/<str:appointment_id>/', AppointmentManagement.as_view(), name='delete-appointment'),
     
     path('drug/add/', DrugInventoryManagement.as_view(), name="add-drug"),
     path('drug/list/', DrugInventoryManagement.as_view(), name="view-drug"),

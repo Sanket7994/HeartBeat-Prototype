@@ -1,11 +1,19 @@
 # Within the project directory
-from .models import CustomUser, Clinic, Drug, ClinicMember, PatientAppointment
+from .models import (
+    CustomUser,
+    Clinic,
+    Drug,
+    ClinicMember,
+    PatientAppointment,
+    MedicalProcedure,
+)
 from .serializer import (
     ClinicSerializer,
     DrugSerializer,
     CustomSerializer,
     ClinicStaffSerializer,
     AppointmentSerializer,
+    MedicalProcedureSerializer
 )
 from .emails import (
     send_email_notification,
@@ -36,6 +44,7 @@ from rest_framework_simplejwt.token_blacklist.models import (
 from datetime import timedelta
 from django.dispatch import Signal
 from django.core.paginator import Paginator, EmptyPage
+from django.shortcuts import get_object_or_404
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.decorators import login_required
@@ -440,22 +449,23 @@ class StaffRelationshipManagementView(APIView):
             queryset = ClinicMember.objects.all().order_by("-created_at")
 
             # Filter by query parameters
-            clinic_name = self.request.GET.get("clinic_name", None)
-            first_name = self.request.GET.get("first_name", None)
-            designation = self.request.GET.get("designation", None)
-            email = self.request.GET.get("email", None)
-            clinic_id = self.request.GET.get("clinic_id", None)
+            filter_params = {
+                "clinic_name": self.request.GET.get("clinic_name"),
+                "first_name": self.request.GET.get("first_name"),
+                "designation": self.request.GET.get("designation"),
+                "email": self.request.GET.get("email"),
+                "clinic_id": self.request.GET.get("clinic_id"),
+                "staff_id": self.request.GET.get("staff_id"),
+            }
+            # Parsing key and value into conditional filter
+            filters = {
+                field: value
+                for field, value in filter_params.items()
+                if value is not None
+            }
 
-            if clinic_name:
-                queryset = queryset.filter(clinic_name=clinic_name)
-            if first_name:
-                queryset = queryset.filter(first_name=first_name)
-            if designation:
-                queryset = queryset.filter(designation=designation)
-            if email:
-                queryset = queryset.filter(email=email)
-            if clinic_id:
-                queryset = queryset.filter(clinic_id=clinic_id)
+            if filters:
+                queryset = queryset.filter(**filters)
 
             # Applying pagination
             set_limit = self.request.GET.get("limit")
@@ -615,21 +625,28 @@ class AppointmentManagement(APIView):
 
     # Create appointment
     def post(self, request):
+        # Retrieve the primary key values of the procedures
+        procedure_ids = request.data.get("procedures", [])
+
         data = {
             "clinic_name": request.data.get("clinic_name"),
-            "recipient": request.data.get("recipient"),
+            "relatedRecipient": request.data.get("relatedRecipient"),
             "patient_first_name": request.data.get("patient_first_name"),
             "patient_last_name": request.data.get("patient_last_name"),
+            "gender": request.data.get("gender"),
             "contact_number": request.data.get("contact_number"),
             "email": request.data.get("email"),
+            "recurring_patient": request.data.get("recurring_patient"),
             "appointment_date": request.data.get("appointment_date"),
             "appointment_slot": request.data.get("appointment_slot"),
             "status": request.data.get("status"),
+            "procedures": procedure_ids,  
         }
 
         serializer = AppointmentSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
+            
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -641,11 +658,15 @@ class AppointmentManagement(APIView):
 
             # filter and Search function for list
             filter_params = {
+                "appointment_id": self.request.GET.get("appointment_id"),
                 "clinic_name": self.request.GET.get("clinic_name"),
+                "relatedDepartment": self.request.GET.get("relatedDepartment"),
+                "relatedRecipient": self.request.GET.get("relatedRecipient"),
                 "patient_first_name": self.request.GET.get("patient_first_name"),
                 "patient_last_name": self.request.GET.get("patient_last_name"),
-                "recipient": self.request.GET.get("recipient"),
-                "email": self.request.GET.get("email"),
+                "gender": self.request.GET.get("gender"),
+                "recurring_patient": self.request.GET.get("recurring_patient"),
+                "procedures": self.request.GET.get("procedures"),
                 "appointment_date": self.request.GET.get("appointment_date"),
                 "appointment_slot": self.request.GET.get("appointment_slot"),
                 "status": self.request.GET.get("status"),
@@ -687,3 +708,33 @@ class AppointmentManagement(APIView):
 
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Update clinic data
+    def put(self, request, appointment_id, *args, **kwargs):
+        try:
+            queryset = PatientAppointment.objects.get(appointment_id=appointment_id)
+        except PatientAppointment.DoesNotExist:
+            return Response(
+                {"error": "Appointment not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = AppointmentSerializer(queryset, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # Delete clinic data
+    def delete(self, request, appointment_id, *args, **kwargs):
+        try:
+            drug_data = PatientAppointment.objects.get(appointment_id=appointment_id)
+        except PatientAppointment.DoesNotExist:
+            return Response(
+                {"error": "Drug not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        drug_data.delete()
+        return Response(
+            data={"message": "Data deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT,
+        )
