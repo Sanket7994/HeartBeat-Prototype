@@ -22,9 +22,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-USE_L10N = False
-DATE_INPUT_FORMATS = ['%d/%m/%Y']  
-
 
 # Application definition
 
@@ -60,8 +57,8 @@ ROOT_URLCONF = "school.urls"
 
 
 AUTH_USER_MODEL = "base_app.CustomUser"
-
 AUTH_PROFILE_MODULE = 'base_app.Profile'
+SENDSMS_BACKEND = 'sendsms.backends.console.SmsBackend'
 
 # If this is used then `CORS_ALLOWED_ORIGINS` will not have any effect
 CORS_ALLOW_ALL_ORIGINS = True

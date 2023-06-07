@@ -12,7 +12,7 @@ from django.contrib.auth.models import (
 )
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _  
 
 
 # Custom User Model
@@ -103,14 +103,13 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         super().save(*args, **kwargs)
 
 
-class StatusCode(models.TextChoices):
-    APPROVED = ("APPROVED", "Approved")
-    PENDING = ("PENDING", "Pending")
-    CANCELLED = ("CANCELLED", "Cancelled")
-
-
 # Clinic Model
 class Clinic(models.Model):
+    class StatusCode(models.TextChoices):
+        APPROVED = ("APPROVED", "Approved")
+        PENDING = ("PENDING", "Pending")
+        CANCELLED = ("CANCELLED", "Cancelled")
+    
     class Country(models.TextChoices):
         UK = ("UK", "UNITED KINGDOM")
         IN = ("IN", "INDIA")
@@ -156,16 +155,21 @@ class Clinic(models.Model):
 
 # clinic Members
 class ClinicMember(models.Model):
+    class StatusCode(models.TextChoices):
+        APPROVED = ("APPROVED", "Approved")
+        PENDING = ("PENDING", "Pending")
+        CANCELLED = ("CANCELLED", "Cancelled")
+    
     class StaffDesignation(models.TextChoices):
-        IVF_COORDINATOR = ("IVF_COORDINATOR", "IVF Coordinator")
-        DONOR_COORDINATOR = ("DONOR_COORDINATOR", "Donor Coordinator")
-        RECEPTIONIST = ("RECEPTIONIST", "Receptionist")
-        ADMIN = ("ADMIN", "Admin")
-        DOCTOR_PHYSICIST = ("DOCTOR_PHYSICIST", "Doctor/Physicist")
-        EMBRYOLOGY = ("EMBRYOLOGY", "Embryology")
-        NURSE = ("NURSE", "Nurse")
-        LABORATORY = ("LABORATORY", "Laboratory")
-        PSYCHOLOGIST_COUNSELLOR = ("PSYCHOLOGIST_COUNSELLOR", "Psychologist/Counsellor")
+        IVF_COORDINATOR = "IVF_COORDINATOR", "IVF Coordinator"
+        DONOR_COORDINATOR = "DONOR_COORDINATOR", "Donor Coordinator"
+        RECEPTIONIST = "RECEPTIONIST", "Receptionist"
+        ADMIN = "ADMIN", "Admin"
+        DOCTOR_PHYSICIST = "DOCTOR_PHYSICIST", "Doctor/Physicist"
+        EMBRYOLOGY = "EMBRYOLOGY", "Embryology"
+        NURSE = "NURSE", "Nurse"
+        LABORATORY = "LABORATORY", "Laboratory"
+        PSYCHOLOGIST_COUNSELLOR = "PSYCHOLOGIST_COUNSELLOR", "Psychologist/Counsellor"
 
     staff_id = models.CharField(
         primary_key=True,
@@ -189,10 +193,8 @@ class ClinicMember(models.Model):
     def save(self, *args, **kwargs):
         if not self.staff_id:
             while True:
-                # Generate a new unique ID
                 new_staff_id = str(uuid.uuid4().hex[:10].upper())
-                # Check if the generated ID already exists in the database
-                if not Clinic.objects.filter(staff_id=new_staff_id).exists():
+                if not ClinicMember.objects.filter(staff_id=new_staff_id).exists():
                     self.staff_id = new_staff_id
                     break
         super().save(*args, **kwargs)
@@ -201,36 +203,40 @@ class ClinicMember(models.Model):
         return f"{self.first_name} {self.last_name}"
 
 
-# Medical procedures choice model
-class MedicalProcedure(models.Model):
-    PROCEDURE_CHOICES = [
-        ("MEDICAL_EXAMINATION", "Medical Examination"),
-        ("ROUTINE_CHECK_UP", "Routine Check-up"),
-        ("RESULT_ANALYSIS", "Result Analysis"),
-        ("BLOOD_TESTS", "Blood Tests"),
-        ("X_RAY", "X-ray"),
-        ("ULTRASOUND", "Ultrasound"),
-        ("VACCINATIONS", "Vaccinations"),
-        ("BIOPSY", "Biopsy"),
-        ("SURGERY", "Surgery"),
-        ("PHYSICAL_THERAPY", "Physical Therapy"),
-        ("ALLERGY_TESTING", "Allergy Testing"),
-        ("HEARING_TEST", "Hearing Test"),
-        ("VISION_TEST", "Vision Test"),
-        ("CARDIAC_STRESS_TEST", "Cardiac Stress Test"),
-        ("ORGAN_DONATION", "Organ Donation"),
-        ("CONSULTATION", "Consultation"),
-    ]
+# # Medical procedures choice model
+# class MedicalProcedure(models.Model):
+#     PROCEDURE_CHOICES = [
+#         ("MEDICAL_EXAMINATION", "Medical Examination"),
+#         ("ROUTINE_CHECK_UP", "Routine Check-up"),
+#         ("RESULT_ANALYSIS", "Result Analysis"),
+#         ("BLOOD_TESTS", "Blood Tests"),
+#         ("X_RAY", "X-ray"),
+#         ("ULTRASOUND", "Ultrasound"),
+#         ("VACCINATIONS", "Vaccinations"),
+#         ("BIOPSY", "Biopsy"),
+#         ("SURGERY", "Surgery"),
+#         ("PHYSICAL_THERAPY", "Physical Therapy"),
+#         ("ALLERGY_TESTING", "Allergy Testing"),
+#         ("HEARING_TEST", "Hearing Test"),
+#         ("VISION_TEST", "Vision Test"),
+#         ("CARDIAC_STRESS_TEST", "Cardiac Stress Test"),
+#         ("ORGAN_DONATION", "Organ Donation"),
+#         ("CONSULTATION", "Consultation"),
+#     ]
 
-    procedure = models.CharField(max_length=100, choices=PROCEDURE_CHOICES)
-
+#     procedure = models.CharField(max_length=100, choices=PROCEDURE_CHOICES)
 
 
 class PatientAppointment(models.Model):
+    class StatusCode(models.TextChoices):
+        APPROVED = ("APPROVED", "Approved")
+        PENDING = ("PENDING", "Pending")
+        CANCELLED = ("CANCELLED", "Cancelled")
+    
     class Gender(models.TextChoices):
-        MALE = ("MALE", "Male")
-        FEMALE = ("FEMALE", "Female")
-        UNDISCLOSED = ("UNDISCLOSED", "Undisclosed")
+        MALE = "MALE", "Male"
+        FEMALE = "FEMALE", "Female"
+        UNDISCLOSED = "UNDISCLOSED", "Undisclosed"
 
     def validate_date(value):
         if value < timezone.now().date():
@@ -243,7 +249,10 @@ class PatientAppointment(models.Model):
         unique=True,
     )
     clinic_name = models.ForeignKey(
-        Clinic, on_delete=models.SET_NULL, null=True, related_name="main_clinic_name"
+        Clinic,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="main_clinic_name",
     )
     relatedDepartment = models.CharField(max_length=100, blank=True, null=True)
     relatedRecipient = models.ForeignKey(
@@ -260,10 +269,7 @@ class PatientAppointment(models.Model):
     email = models.EmailField(blank=True, null=True)
     contact_number = models.CharField(max_length=50, blank=True, null=True)
     recurring_patient = models.BooleanField(default=False)
-    procedures = models.ManyToManyField(
-        MedicalProcedure,
-        blank=True,
-    )
+    procedures = models.CharField(max_length=255, default=list, blank=True, null=True)
     appointment_date = models.DateField(
         validators=[validate_date],
         default=timezone.now,
@@ -277,14 +283,13 @@ class PatientAppointment(models.Model):
     def save(self, *args, **kwargs):
         if not self.appointment_id:
             while True:
-                # Generate a new unique ID
                 new_appointment_id = str(uuid.uuid4().hex[:10].upper())
-                # Check if the generated ID already exists in the database
                 if not PatientAppointment.objects.filter(
                     appointment_id=new_appointment_id
                 ).exists():
                     self.appointment_id = new_appointment_id
                     break
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.appointment_id

@@ -5,7 +5,6 @@ from django.core.mail import send_mail
 
 #### Email seeding functions #####
 
-
 # Email notification after signup
 def send_email_notification(recipient_list):
     email_from = settings.DEFAULT_FROM_EMAIL

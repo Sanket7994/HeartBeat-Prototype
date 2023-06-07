@@ -5,7 +5,6 @@ from .models import (
     Drug,
     ClinicMember,
     PatientAppointment,
-    MedicalProcedure,
 )
 from .serializer import (
     ClinicSerializer,
@@ -13,7 +12,6 @@ from .serializer import (
     CustomSerializer,
     ClinicStaffSerializer,
     AppointmentSerializer,
-    MedicalProcedureSerializer
 )
 from .emails import (
     send_email_notification,
@@ -23,6 +21,8 @@ from .emails import (
 )
 from .serializer import ForgotPasswordSerializer, ResetPasswordSerializer
 from .filter import filter_queryset
+from django.db.models import Q
+
 
 # External REST libraries and models
 
@@ -625,12 +625,9 @@ class AppointmentManagement(APIView):
 
     # Create appointment
     def post(self, request):
-        # Retrieve the primary key values of the procedures
-        procedure_ids = request.data.get("procedures", [])
-        print(procedure_ids)
-
         data = {
             "clinic_name": request.data.get("clinic_name"),
+            "relatedDepartment": request.data.get("relatedDepartment"),
             "relatedRecipient": request.data.get("relatedRecipient"),
             "patient_first_name": request.data.get("patient_first_name"),
             "patient_last_name": request.data.get("patient_last_name"),
@@ -641,17 +638,17 @@ class AppointmentManagement(APIView):
             "appointment_date": request.data.get("appointment_date"),
             "appointment_slot": request.data.get("appointment_slot"),
             "status": request.data.get("status"),
-            "procedures": procedure_ids,  
+            "procedures": request.data.get("procedures"),
         }
-
+        
         serializer = AppointmentSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
-            
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+class AppointmentManagement(APIView):
+    permission_classes = [permissions.AllowAny]
     # View appointment List
     def get(self, request, *args, **kwargs):
         try:
@@ -667,17 +664,19 @@ class AppointmentManagement(APIView):
                 "patient_last_name": self.request.GET.get("patient_last_name"),
                 "gender": self.request.GET.get("gender"),
                 "recurring_patient": self.request.GET.get("recurring_patient"),
-                "procedures": self.request.GET.get("procedures"),
                 "appointment_date": self.request.GET.get("appointment_date"),
                 "appointment_slot": self.request.GET.get("appointment_slot"),
                 "status": self.request.GET.get("status"),
+                "procedures": self.request.GET.get("procedures"),
             }
-            # Parsing key and value into conditional filter
-            filters = {
-                field: value
-                for field, value in filter_params.items()
-                if value is not None
-            }
+
+            # Remove empty filter parameters
+            filters = {field: value for field, value in filter_params.items() if value is not None}
+
+            if "procedures" in filters:
+                procedures = filters.pop("procedures")
+                for procedure in procedures:
+                    queryset = queryset.filter(procedures__in=procedure)
 
             if filters:
                 queryset = queryset.filter(**filters)
@@ -701,7 +700,6 @@ class AppointmentManagement(APIView):
                 },
                 "Result": serializer.data,
             }
-
             return Response(
                 payload,
                 status=status.HTTP_200_OK,
