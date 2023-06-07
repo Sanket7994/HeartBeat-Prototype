@@ -55,7 +55,8 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "school.urls"
 
-
+TWILIO_AUTH_TOKEN = "0f1d232a3732fee759ec79a1cc3661fd"
+TWILIO_ACCOUNT_SID = "AC020c80464a30b1ecbac0d2613f7dd2be"
 AUTH_USER_MODEL = "base_app.CustomUser"
 AUTH_PROFILE_MODULE = 'base_app.Profile'
 SENDSMS_BACKEND = 'sendsms.backends.console.SmsBackend'

@@ -18,10 +18,15 @@ from .emails import (
     send_forget_password_mail,
     send_user_profile_update_notification,
     send_user_profile_delete_notification,
+    send_email_notification_to_patient,
+    send_email_notification_to_staff,
 )
+
+from .sms import send_sms_notification
 from .serializer import ForgotPasswordSerializer, ResetPasswordSerializer
 from .filter import filter_queryset
 from django.db.models import Q
+import json as simplejson
 
 
 # External REST libraries and models
@@ -641,14 +646,26 @@ class AppointmentManagement(APIView):
             "procedures": request.data.get("procedures"),
         }
         
+
+        # Fetching data
+        queryset = ClinicMember.objects.filter(staff_id=data.get("relatedRecipient")).values('first_name', 'last_name', 'email', 'contact_number')[0]
+        print(queryset)
+        print(type(queryset))
+        relatedRecipient_contact_number = queryset.get("contact_number")
+        # Sending Email Notifications
+        send_email_notification_to_staff(queryset)
+        send_email_notification_to_patient(data, queryset)
+        
+        # Sending SMS Notifications
+        send_sms_notification(data, queryset)
+        
         serializer = AppointmentSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-class AppointmentManagement(APIView):
-    permission_classes = [permissions.AllowAny]
+
     # View appointment List
     def get(self, request, *args, **kwargs):
         try:
@@ -670,13 +687,8 @@ class AppointmentManagement(APIView):
                 "procedures": self.request.GET.get("procedures"),
             }
 
-            # Remove empty filter parameters
+            # Parsing key and value into conditional filter
             filters = {field: value for field, value in filter_params.items() if value is not None}
-
-            if "procedures" in filters:
-                procedures = filters.pop("procedures")
-                for procedure in procedures:
-                    queryset = queryset.filter(procedures__in=procedure)
 
             if filters:
                 queryset = queryset.filter(**filters)

@@ -13,6 +13,9 @@ from django.contrib.auth.models import (
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _  
+from phonenumber_field.modelfields import PhoneNumberField
+from django.core.validators import RegexValidator
+
 
 
 # Custom User Model
@@ -125,7 +128,7 @@ class Clinic(models.Model):
     )
     user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True)
     clinic_name = models.CharField(max_length=100, blank=False, null=False)
-    contact_number = models.CharField(max_length=50, blank=True, null=True)
+    contact_number = PhoneNumberField(blank=True, null=True, default=None, validators=[RegexValidator(r'^(\+\d{1,3})?,?\s?\d{8,15}')])
     address = models.CharField(max_length=250, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
     country = models.CharField(
@@ -183,7 +186,8 @@ class ClinicMember(models.Model):
     designation = models.CharField(
         max_length=100, choices=StaffDesignation.choices, default=None, null=True
     )
-    email = models.EmailField(blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)    
+    contact_number = PhoneNumberField(default=None, null=True, blank=True, validators=[RegexValidator(r'^(\+\d{1,3})?,?\s?\d{8,15}')])
     status = models.CharField(
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
@@ -267,7 +271,7 @@ class PatientAppointment(models.Model):
         max_length=100, choices=Gender.choices, default=None, null=True
     )
     email = models.EmailField(blank=True, null=True)
-    contact_number = models.CharField(max_length=50, blank=True, null=True)
+    contact_number = PhoneNumberField(blank=True, null=True, validators=[RegexValidator(r'^(\+\d{1,3})?,?\s?\d{8,15}')], default=None)
     recurring_patient = models.BooleanField(default=False)
     procedures = models.CharField(max_length=255, default=list, blank=True, null=True)
     appointment_date = models.DateField(
@@ -300,7 +304,6 @@ class Drug(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True)
     drug_id = models.CharField(
         primary_key=True,
-        default=str(uuid.uuid4().hex[:10].upper()),
         max_length=50,
         editable=False,
         unique=True,

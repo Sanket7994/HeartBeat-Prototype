@@ -5,6 +5,7 @@ from django.core.mail import send_mail
 
 #### Email seeding functions #####
 
+
 # Email notification after signup
 def send_email_notification(recipient_list):
     email_from = settings.DEFAULT_FROM_EMAIL
@@ -17,7 +18,6 @@ def send_email_notification(recipient_list):
 
 # Email notification If user changes Profile information
 def send_user_profile_update_notification(recipient_list):
-    
     email_from = settings.DEFAULT_FROM_EMAIL
     subject = "Account Update Notification"
     message = """
@@ -58,7 +58,6 @@ Team HeartBeat
 
 # Email notification If user changes Profile information
 def send_user_profile_delete_notification(recipient_list):
-    
     email_from = settings.DEFAULT_FROM_EMAIL
     subject = "Account Deletion Notification"
     message = f"""
@@ -75,5 +74,46 @@ Team HeartBeat
 
 """
     send_mail(subject, message, email_from, recipient_list)
+
+    return True
+
+
+# Email notification after signup
+def send_email_notification_to_staff(staff_member):
+    relatedRecipient_email = staff_member.get("email")
+    email_from = settings.DEFAULT_FROM_EMAIL
+    subject = "Appointment update Notification"
+    message = f"""
+Hi {staff_member.get('first_name')}, 
+
+An appointment has been successfully setup with the client. 
+please check the dashboard for more information.
+
+Kind regards,
+project Support Team
+"""
+    send_mail(subject, message, email_from, [relatedRecipient_email])
+
+    return True
+
+
+# Email notification after signup
+def send_email_notification_to_patient(patient, staff_member):
+    relatedRecipient_firstName = staff_member.get("first_name")
+    relatedRecipient_lastName = staff_member.get("last_name")
+    patient_email = patient.get("email")
+    email_from = settings.DEFAULT_FROM_EMAIL
+    subject = "Appointment update Notification"
+    message = f"""
+Hi {patient.get('patient_first_name')}, 
+
+An appointment has been successfully setup with Dr.{relatedRecipient_firstName} {relatedRecipient_lastName} on {patient.get('appointment_date')} at assigned time slot of {patient.get('appointment_slot')}. 
+
+Our Team will be waiting for your arrival. Thanks for choosing us.
+
+Kind regards,
+project Support Team
+"""
+    send_mail(subject, message, email_from, [patient_email])
 
     return True
