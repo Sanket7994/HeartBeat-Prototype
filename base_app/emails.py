@@ -7,10 +7,19 @@ from django.core.mail import send_mail
 
 
 # Email notification after signup
-def send_email_notification(recipient_list):
+def send_email_notification(recipient_list, fetched_activation_OTP):
+    
     email_from = settings.DEFAULT_FROM_EMAIL
-    subject = "Account Activation Notification"
-    message = "Your account has been activated"
+    subject = "Account Update Notification"
+    message = f"""
+    Hi, 
+    
+    Your Account activation key is {fetched_activation_OTP}.
+    Enter the key on registration form.
+     
+    Thanks! Regards.
+    TestProject Support Team
+    """
     send_mail(subject, message, email_from, recipient_list)
 
     return True
@@ -27,7 +36,7 @@ def send_user_profile_update_notification(recipient_list):
     Please check your account and If you haven`t updated any information Please contact our Customer Support. 
      
     Thanks! Regards.
-    Team HeartBeat
+    TestProject Support Team
     """
     send_mail(subject, message, email_from, recipient_list)
 
@@ -47,7 +56,7 @@ There was a request to change your password!
 Please click this link to change your password: {reset_password_link}
 
 Kind regards,
-Team HeartBeat
+TestProject Support Team
 """,
         email_from,
         [recipient_list],
@@ -70,7 +79,7 @@ If you have any further queries or require assistance, please don't hesitate to 
 Thank you for being a part of HeartBeat. We appreciate your past support and wish you all the best in your future endeavors.
 
 Kind regards,
-Team HeartBeat
+TestProject Support Team
 
 """
     send_mail(subject, message, email_from, recipient_list)
@@ -90,7 +99,7 @@ An appointment has been successfully setup with the client.
 please check the dashboard for more information.
 
 Kind regards,
-project Support Team
+TestProject Support Team
 """
     send_mail(subject, message, email_from, [relatedRecipient_email])
 
@@ -112,7 +121,7 @@ An appointment has been successfully setup with Dr.{relatedRecipient_firstName} 
 Our Team will be waiting for your arrival. Thanks for choosing us.
 
 Kind regards,
-project Support Team
+TestProject Support Team
 """
     send_mail(subject, message, email_from, [patient_email])
 

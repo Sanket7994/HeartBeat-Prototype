@@ -1,6 +1,8 @@
-one = ['+', '9', '1', '8', '2', '3', '6', '9', '9', '1', '5', '9', '5']
-integer = ''.join(one)
-print(type(one))
-print(one)
-print(type(integer))
-print(integer)
+import datetime as dt
+
+
+HOUR_CHOICES = [(dt.time(hour=x), '{:02d}:00'.format(x)) for x in range(7, 13)]
+
+
+print(type(HOUR_CHOICES[0]))
+print(HOUR_CHOICES[0])

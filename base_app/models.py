@@ -1,7 +1,7 @@
 # Imports
 import uuid
 from django.utils import timezone
-import datetime
+from datetime import time
 from school import settings
 from PIL import Image
 from django.db import models
@@ -12,10 +12,9 @@ from django.contrib.auth.models import (
 )
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _  
+from django.utils.translation import gettext_lazy as _
 from phonenumber_field.modelfields import PhoneNumberField
 from django.core.validators import RegexValidator
-
 
 
 # Custom User Model
@@ -112,7 +111,7 @@ class Clinic(models.Model):
         APPROVED = ("APPROVED", "Approved")
         PENDING = ("PENDING", "Pending")
         CANCELLED = ("CANCELLED", "Cancelled")
-    
+
     class Country(models.TextChoices):
         UK = ("UK", "UNITED KINGDOM")
         IN = ("IN", "INDIA")
@@ -128,7 +127,13 @@ class Clinic(models.Model):
     )
     user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True)
     clinic_name = models.CharField(max_length=100, blank=False, null=False)
-    contact_number = PhoneNumberField(blank=True, null=True, default=None, validators=[RegexValidator(r'^(\+\d{1,3})?,?\s?\d{8,15}')])
+    avatar = models.ImageField(default="avatar.jpg", upload_to="profile_avatars")
+    contact_number = PhoneNumberField(
+        blank=True,
+        null=True,
+        default=None,
+        validators=[RegexValidator(r"^(\+\d{1,3})?,?\s?\d{8,15}")],
+    )
     address = models.CharField(max_length=250, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
     country = models.CharField(
@@ -152,6 +157,19 @@ class Clinic(models.Model):
                     break
         super().save(*args, **kwargs)
 
+    def save(self, *args, **kwargs):
+        # save the profile
+        super().save(*args, **kwargs)
+
+        # resize the profile image first
+        img = Image.open(self.avatar.path)
+        if img.height > 150 or img.width > 150:
+            output_size = (150, 150)
+            # create a thumbnail
+            img.thumbnail(output_size)
+            # overwrite the larger image
+            img.save(self.avatar.path)
+
     def __str__(self):
         return self.clinic_name
 
@@ -162,7 +180,7 @@ class ClinicMember(models.Model):
         APPROVED = ("APPROVED", "Approved")
         PENDING = ("PENDING", "Pending")
         CANCELLED = ("CANCELLED", "Cancelled")
-    
+
     class StaffDesignation(models.TextChoices):
         IVF_COORDINATOR = "IVF_COORDINATOR", "IVF Coordinator"
         DONOR_COORDINATOR = "DONOR_COORDINATOR", "Donor Coordinator"
@@ -174,6 +192,28 @@ class ClinicMember(models.Model):
         LABORATORY = "LABORATORY", "Laboratory"
         PSYCHOLOGIST_COUNSELLOR = "PSYCHOLOGIST_COUNSELLOR", "Psychologist/Counsellor"
 
+    class Shift_type(models.TextChoices):
+        GENERAL_SHIFT = (
+            "General Shift 9AM - 6PM",
+            f"{time(9, 0).strftime('%I:%M %p')} - {time(18, 0).strftime('%I:%M %p')}",
+        )
+        FLEX_SHIFT_1 = (
+            "Flex Shift 10AM - 2PM",
+            f"{time(10, 0).strftime('%I:%M %p')} - {time(14, 0).strftime('%I:%M %p')}",
+        )
+        FLEX_SHIFT_2 = (
+            "Flex Shift 3PM - 7PM",
+            f"{time(15, 0).strftime('%I:%M %p')} - {time(19, 0).strftime('%I:%M %p')}",
+        )
+        FRONT_LINE_SHIFT_1 = (
+            "Front Line Shift 7AM - 7PM",
+            f"{time(7, 0).strftime('%I:%M %p')} - {time(19, 0).strftime('%I:%M %p')}",
+        )
+        FRONT_LINE_SHIFT_2 = (
+            "Front Line Shift 7PM - 7AM",
+            f"{time(19, 0).strftime('%I:%M %p')} - {time(7, 0).strftime('%I:%M %p')}",
+        )
+
     staff_id = models.CharField(
         primary_key=True,
         max_length=50,
@@ -183,11 +223,20 @@ class ClinicMember(models.Model):
     clinic_name = models.ForeignKey(Clinic, on_delete=models.SET_NULL, null=True)
     first_name = models.CharField(max_length=100, blank=False, null=False)
     last_name = models.CharField(max_length=100, blank=False, null=False)
+    avatar = models.ImageField(default="avatar.jpg", upload_to="profile_avatars")
     designation = models.CharField(
         max_length=100, choices=StaffDesignation.choices, default=None, null=True
     )
-    email = models.EmailField(blank=True, null=True)    
-    contact_number = PhoneNumberField(default=None, null=True, blank=True, validators=[RegexValidator(r'^(\+\d{1,3})?,?\s?\d{8,15}')])
+    shift_type = models.CharField(
+        max_length=100, choices=Shift_type.choices, default=Shift_type.GENERAL_SHIFT
+    )
+    email = models.EmailField(blank=True, null=True)
+    contact_number = PhoneNumberField(
+        default=None,
+        null=True,
+        blank=True,
+        validators=[RegexValidator(r"^(\+\d{1,3})?,?\s?\d{8,15}")],
+    )
     status = models.CharField(
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
@@ -203,40 +252,30 @@ class ClinicMember(models.Model):
                     break
         super().save(*args, **kwargs)
 
+    def save(self, *args, **kwargs):
+        # save the profile
+        super().save(*args, **kwargs)
+
+        # resize the profile image first
+        img = Image.open(self.avatar.path)
+        if img.height > 150 or img.width > 150:
+            output_size = (150, 150)
+            # create a thumbnail
+            img.thumbnail(output_size)
+            # overwrite the larger image
+            img.save(self.avatar.path)
+
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
 
-# # Medical procedures choice model
-# class MedicalProcedure(models.Model):
-#     PROCEDURE_CHOICES = [
-#         ("MEDICAL_EXAMINATION", "Medical Examination"),
-#         ("ROUTINE_CHECK_UP", "Routine Check-up"),
-#         ("RESULT_ANALYSIS", "Result Analysis"),
-#         ("BLOOD_TESTS", "Blood Tests"),
-#         ("X_RAY", "X-ray"),
-#         ("ULTRASOUND", "Ultrasound"),
-#         ("VACCINATIONS", "Vaccinations"),
-#         ("BIOPSY", "Biopsy"),
-#         ("SURGERY", "Surgery"),
-#         ("PHYSICAL_THERAPY", "Physical Therapy"),
-#         ("ALLERGY_TESTING", "Allergy Testing"),
-#         ("HEARING_TEST", "Hearing Test"),
-#         ("VISION_TEST", "Vision Test"),
-#         ("CARDIAC_STRESS_TEST", "Cardiac Stress Test"),
-#         ("ORGAN_DONATION", "Organ Donation"),
-#         ("CONSULTATION", "Consultation"),
-#     ]
-
-#     procedure = models.CharField(max_length=100, choices=PROCEDURE_CHOICES)
-
-
+# Create appointments
 class PatientAppointment(models.Model):
     class StatusCode(models.TextChoices):
         APPROVED = ("APPROVED", "Approved")
         PENDING = ("PENDING", "Pending")
         CANCELLED = ("CANCELLED", "Cancelled")
-    
+
     class Gender(models.TextChoices):
         MALE = "MALE", "Male"
         FEMALE = "FEMALE", "Female"
@@ -245,6 +284,11 @@ class PatientAppointment(models.Model):
     def validate_date(value):
         if value < timezone.now().date():
             raise ValidationError(_("Invalid date."))
+
+    def validate_weekday(self):
+        if (
+            self.appointment_date.weekday() >= 5): 
+            raise ValidationError(_("Appointments are not available on weekends"))
 
     appointment_id = models.CharField(
         primary_key=True,
@@ -271,11 +315,16 @@ class PatientAppointment(models.Model):
         max_length=100, choices=Gender.choices, default=None, null=True
     )
     email = models.EmailField(blank=True, null=True)
-    contact_number = PhoneNumberField(blank=True, null=True, validators=[RegexValidator(r'^(\+\d{1,3})?,?\s?\d{8,15}')], default=None)
+    contact_number = PhoneNumberField(
+        blank=True,
+        null=True,
+        validators=[RegexValidator(r"^(\+\d{1,3})?,?\s?\d{8,15}")],
+        default=None,
+    )
     recurring_patient = models.BooleanField(default=False)
     procedures = models.CharField(max_length=255, default=list, blank=True, null=True)
     appointment_date = models.DateField(
-        validators=[validate_date],
+        validators=[validate_date, validate_weekday],
         default=timezone.now,
     )
     appointment_slot = models.CharField(blank=False, max_length=50)
@@ -297,24 +346,3 @@ class PatientAppointment(models.Model):
 
     def __str__(self):
         return self.appointment_id
-
-
-# Add drug information
-class Drug(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True)
-    drug_id = models.CharField(
-        primary_key=True,
-        max_length=50,
-        editable=False,
-        unique=True,
-    )
-    drug_name = models.CharField(max_length=200, unique=True, blank=False, null=False)
-    company = models.CharField(max_length=200)
-    generic_name = models.CharField(max_length=200)
-    quantity = models.IntegerField(blank=False, null=False)
-    unit_price = models.FloatField(null=True, blank=True)
-    last_updated = models.DateTimeField(auto_now=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.drug_name

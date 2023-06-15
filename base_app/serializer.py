@@ -1,10 +1,12 @@
-from rest_framework import fields, serializers
-from .models import CustomUser, Clinic, Drug, ClinicMember, PatientAppointment
+import string
+from rest_framework import serializers
+from .models import CustomUser, Clinic, ClinicMember, PatientAppointment
 
 # To convert the Model object to an API-appropriate format like JSON,
 # Django REST framework uses the ModelSerializer class to convert any model to serialized JSON objects:
 
 
+# User
 class CustomSerializer(serializers.ModelSerializer):
     created_at = serializers.ReadOnlyField()
 
@@ -16,9 +18,23 @@ class CustomSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "select_role",
+            "avatar",
             "created_at",
         )
         extra_kwargs = {"password": {"write_only": True}}
+
+
+# Verify OTP
+class VerifyOTPSerializer(serializers.Serializer):
+    otp = serializers.CharField(max_length=8)
+
+    def validate_otp(self, otp):
+        if (
+            not all(c in string.ascii_letters + string.digits for c in otp)
+            or len(otp) != 8
+        ):
+            raise serializers.ValidationError("Invalid OTP format.")
+        return otp
 
 
 # Forgot password authentication
@@ -71,6 +87,7 @@ class ClinicStaffSerializer(serializers.ModelSerializer):
             "last_name",
             "email",
             "designation",
+            "shift_type",
             "status",
             "created_at",
         )
@@ -85,19 +102,4 @@ class AppointmentSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-# Drug Information
-class DrugSerializer(serializers.ModelSerializer):
-    created_at = serializers.ReadOnlyField()
 
-    class Meta:
-        model = Drug
-        fields = (
-            "drug_id",
-            "user",
-            "drug_name",
-            "company",
-            "generic_name",
-            "quantity",
-            "unit_price",
-            "created_at",
-        )

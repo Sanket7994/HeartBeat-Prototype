@@ -6,24 +6,28 @@ from twilio.rest import Client
 # Read more at http://twil.io/secure
 
 
+# send sms notification to patient
 def send_sms_notification_patient(patient, staff_member):
     relatedRecipient_firstName = staff_member.get("first_name")
     relatedRecipient_lastName = staff_member.get("last_name")
     patientNumber = "".join(list(patient.get("contact_number")))
-  
+
     account_sid = settings.TWILIO_ACCOUNT_SID
     auth_token = settings.TWILIO_AUTH_TOKEN
     client = Client(account_sid, auth_token)
     message = client.messages.create(
+        messaging_service_sid=settings.TWILIO_MESSAGING_SERVICE_SID,
         body=f"""
 Hi {patient.get('patient_first_name')}, 
 
-An appointment has been successfully setup with Dr,{relatedRecipient_firstName} {relatedRecipient_lastName} on {patient.get('appointment_date')} at assigned time slot of {patient.get('appointment_slot')}. 
+An appointment has been successfully setup with Dr.{relatedRecipient_firstName} {relatedRecipient_lastName} on {patient.get('appointment_date')} at assigned time slot of {patient.get('appointment_slot')}. 
 
-Our Team will be waiting for your arrival. Thanks for choosing us.
+If you are unable to make this appointment or would like to change your appointment to a different date or time reply to this email.
+
+Thank you for your business,
 
 Kind regards,
-project Support Team
+TestProject Support Team
 """,
         from_="+13614597582",
         to=patientNumber,
@@ -31,17 +35,19 @@ project Support Team
     print(message.sid)
 
 
+# send sms notification to staff_member
 def send_sms_notification_staff_member(staff_member):
     relatedRecipient_firstName = staff_member.get("first_name")
-    relatedRecipient_lastName = staff_member.get("last_name")
     staff_memberNumber = "".join(list(staff_member.get("contact_number")))
+    print(staff_memberNumber)
 
     account_sid = settings.TWILIO_ACCOUNT_SID
     auth_token = settings.TWILIO_AUTH_TOKEN
     client = Client(account_sid, auth_token)
     message = client.messages.create(
+        messaging_service_sid=settings.TWILIO_MESSAGING_SERVICE_SID,
         body=f"""
-Hi {staff_member.get('first_name')}, 
+Hi {relatedRecipient_firstName}, 
 
 An appointment has been successfully setup with the client. 
 please check the dashboard for more information.

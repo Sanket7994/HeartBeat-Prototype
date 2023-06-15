@@ -2,13 +2,11 @@
 from .models import (
     CustomUser,
     Clinic,
-    Drug,
     ClinicMember,
     PatientAppointment,
 )
 from .serializer import (
     ClinicSerializer,
-    DrugSerializer,
     CustomSerializer,
     ClinicStaffSerializer,
     AppointmentSerializer,
@@ -22,15 +20,19 @@ from .emails import (
     send_email_notification_to_staff,
 )
 
-from .sms import send_sms_notification
-from .serializer import ForgotPasswordSerializer, ResetPasswordSerializer
+from .sms import send_sms_notification_patient, send_sms_notification_staff_member
+
 from .filter import filter_queryset
-from django.db.models import Q
-import json as simplejson
+from .otp_maker import generate_time_based_otp, is_otp_valid
+
+from .serializer import (
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer,
+    VerifyOTPSerializer,
+)
 
 
 # External REST libraries and models
-
 from rest_framework import status
 from rest_framework import permissions
 from rest_framework.views import APIView
@@ -46,14 +48,17 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 
 # External Django libraries and modules
+
+from datetime import date
 from datetime import timedelta
+from django.db.models import Q
 from django.dispatch import Signal
 from django.core.paginator import Paginator, EmptyPage
 from django.shortcuts import get_object_or_404
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.tokens import default_token_generator
 
@@ -77,22 +82,34 @@ class SignupView(APIView):
             first_name = request.data.get("first_name")
             last_name = request.data.get("last_name")
             password = request.data.get("password")
+            confirm_password = request.data.get("confirm_password")
             select_role = request.data.get("select_role")
 
             is_email_exits = CustomUser.objects.filter(email=email)
+
             # Error case handling for User
             if is_email_exits.exists():
                 return Response(
-                    data={"message": "Email already exits"},
+                    data={"message": "Email already exists"},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
+            # Password Mismatch Case
+            if password != confirm_password:
+                return Response(
+                    data={"message": "Passwords don't match"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # User Role selection
             if select_role == "OPERATOR":
                 is_operator = True
                 is_clinic_management = False
+                is_active = False
             elif select_role == "CLINIC_MANAGEMENT":
                 is_operator = False
                 is_clinic_management = True
+                is_active = False
             else:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -103,24 +120,110 @@ class SignupView(APIView):
                 select_role=select_role,
                 is_operator=is_operator,
                 is_clinic_management=is_clinic_management,
+                is_active=is_active,
             )
-            user.set_password(password)
             user.save()
-            # Sending Account activation notification email
-            send_email_notification([user])
+
+            # Generate and send the 6 digit OTP to the user's email address
+            OTP_length = 8
+            OTP = generate_time_based_otp(OTP_length)
+
+            # Store the email and generated OTP in the session or any other storage
+            request.session["email"] = email
+            request.session["otp"] = OTP
+            request.session["password"] = password
+
+            # Email OTP verification
+            send_email_notification([user], OTP)
+
             return Response(
                 data={
-                    "message": "Account has been created and sent notification Successfully, Kindly Check."
+                    "message": "Your account has been registered now. To activate it, Confirm OTP."
                 },
-                status=status.HTTP_201_CREATED,
+                status=status.HTTP_200_OK,
             )
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Resend Email OTP as per user request
+class ResendOTP(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            max_attempt = 3
+            count = request.session.get("resend_otp_count", 0)
+            if count < max_attempt:
+                # Retrieve the email and OTP from the session or any other storage
+                stored_email = request.session.get("email")
+                # Generate new OTP
+                OTP_length = 8
+                OTP = generate_time_based_otp(OTP_length)
+                # Resend OTP email
+                send_email_notification([stored_email], OTP)
+                # Increment tries and update session
+                count += 1
+                request.session["resend_otp_count"] = count
+
+                return Response(
+                    data={
+                        "message": f"Attempt: {count} of 3: Email with a 6-digit OTP has been sent to {stored_email}. Please check your email."}, 
+                    status=status.HTTP_200_OK,)
+            else:
+                return Response(
+                    data={
+                        "message": "Maximum number of OTP resend attempts reached. Please contact support for assistance."}, 
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,)
+        except Exception as e:
+            return Response(data={"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+# Email OTP Based User Account Verification
+class VerifyOTPView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = VerifyOTPSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            otp = serializer.validated_data["otp"]
+            
+        if is_otp_valid(otp) != True:
+            return Response(
+                        data={"error_message": "OTP Expired. Try Again as It`s only valid for 10 mins!"}, 
+                        status=status.HTTP_200_OK,)
+
+        # Retrieve the email and OTP from the session or any other storage
+        stored_email = request.session.get("email")
+        stored_otp = request.session.get("otp")
+        stored_password = request.session.get("password")
+        try:
+            if stored_email and stored_otp:
+                if otp == stored_otp:
+                    # OTP is valid, create the user account
+                    user = CustomUser.objects.get(email=stored_email)
+                    user.set_password(stored_password)
+                    user.is_active = True
+                    user.save()
+
+                    # Clear the email and OTP from the session or any other storage
+                    del request.session["email"]
+                    del request.session["otp"]
+
+                    return Response(
+                        data={
+                            "error_message": "Account verified successfully. You can now log in."}, 
+                        status=status.HTTP_200_OK,
+                    )
+        except Exception as e:
+            return Response(data={"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+
 # User Account Login API
 class LoginView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [
+        permissions.AllowAny,
+    ]
 
     def post(self, request, *args, **kwargs):
         try:
@@ -194,7 +297,7 @@ class MyTokenObtainPairView(TokenObtainPairView):
 
 # User Account Logout API
 class LogoutView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         try:
@@ -204,7 +307,7 @@ class LogoutView(APIView):
 
             return Response(
                 {"message": "Logged out successfully"},
-                status=status.HTTP_205_RESET_CONTENT,
+                status=status.HTTP_200_OK,
             )
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -212,7 +315,9 @@ class LogoutView(APIView):
 
 # User Account Forgot Password API
 class ForgotPasswordView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [
+        permissions.IsAuthenticated,
+    ]
 
     def post(self, request, *args, **kwargs):
         serializer = ForgotPasswordSerializer(data=request.data)
@@ -243,7 +348,9 @@ class ForgotPasswordView(APIView):
 
 # User Account Reset Password API
 class ResetPasswordView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [
+        permissions.IsAuthenticated,
+    ]
 
     def post(self, request, *args, **kwargs):
         try:
@@ -280,14 +387,14 @@ class ResetPasswordView(APIView):
 
 # USER PROFILE OPERATIONS
 class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
-    # Allow only authenticated users to access this url
-    permission_classes = [permissions.AllowAny]
+    # Allow only authenticated users to access this URL
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = CustomSerializer
 
     # View user data
     def get(self, request, id, *args, **kwargs):
         try:
-            user_profile = CustomUser.objects.get(id=id)
+            user_profile = CustomUser.objects.get(user__id=id)
         except CustomUser.DoesNotExist:
             return Response(
                 {"error": "User profile not found."}, status=status.HTTP_404_NOT_FOUND
@@ -299,7 +406,7 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
     # Update user data
     def put(self, request, id, *args, **kwargs):
         try:
-            user_data = CustomUser.objects.get(id=id)
+            user_data = CustomUser.objects.get(user__id=id)
         except CustomUser.DoesNotExist:
             return Response(
                 {"error": "User profile not found."}, status=status.HTTP_404_NOT_FOUND
@@ -326,7 +433,7 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
     def delete(self, request, id, *args, **kwargs):
         try:
             try:
-                user_data = CustomUser.objects.get(id=id)
+                user_data = CustomUser.objects.get(user__id=id)
             except CustomUser.DoesNotExist:
                 return Response(
                     {"error": "User profile not found."},
@@ -437,6 +544,7 @@ class StaffRelationshipManagementView(APIView):
             "first_name": request.data.get("first_name"),
             "last_name": request.data.get("last_name"),
             "designation": request.data.get("designation"),
+            "shift_type": request.data.get("shift_type"),
             "email": request.data.get("email"),
             "status": request.data.get("status"),
         }
@@ -459,6 +567,7 @@ class StaffRelationshipManagementView(APIView):
                 "first_name": self.request.GET.get("first_name"),
                 "designation": self.request.GET.get("designation"),
                 "email": self.request.GET.get("email"),
+                "shift_type": self.request.GET.get("shift_type"),
                 "clinic_id": self.request.GET.get("clinic_id"),
                 "staff_id": self.request.GET.get("staff_id"),
             }
@@ -472,7 +581,51 @@ class StaffRelationshipManagementView(APIView):
             if filters:
                 queryset = queryset.filter(**filters)
 
-            # Applying pagination
+            ##################### GETTING APPOINTMENT RELATED DATA ########################
+
+            appointment_queryset = PatientAppointment.objects.all().order_by(
+                "-created_at"
+            )
+            # Get all unique relatedRecipients
+            unique_recipients = appointment_queryset.values_list(
+                "relatedRecipient", flat=True
+            ).distinct()
+
+            current_date = date.today()
+            recipient_dict = {}
+
+            for recipient in unique_recipients:
+                # Filter appointments for the current recipient
+                recipient_appointments = appointment_queryset.filter(
+                    relatedRecipient=recipient
+                )
+
+                # Get a list of appointment dates for the current recipient
+                appointment_dates = recipient_appointments.values_list(
+                    "appointment_date", flat=True
+                )
+
+                # Convert the queryset values to a list
+                appointment_dates = list(appointment_dates)
+
+                # Check if appointment_dates is empty after filtering
+                if not appointment_dates:
+                    appointment_count = 0
+                    availability = True
+                else:
+                    # Get the total number of appointment dates for the current recipient
+                    appointment_count = len(appointment_dates)
+                    # Check availability based on the current date
+                    availability = current_date not in appointment_dates
+
+                # Assign the count and availability to the recipient key in the dictionary
+                recipient_dict[recipient] = {
+                    "appointment_count": appointment_count,
+                    "availability": availability,
+                }
+
+            ################ Applying pagination ################
+
             set_limit = self.request.GET.get("limit")
             paginator = Paginator(queryset, set_limit)
             page_number = self.request.GET.get("page")
@@ -480,22 +633,27 @@ class StaffRelationshipManagementView(APIView):
             page_obj = paginator.get_page(page_number)
             serializer = ClinicStaffSerializer(page_obj, many=True)
 
+            # result list
+            result_data = serializer.data
+
+            # Merge recipient_dict with Result by matching recipient ID
+            for item in result_data:
+                recipient_id = item["staff_id"]
+                if recipient_id in recipient_dict:
+                    item.update(recipient_dict[recipient_id])
+
             # result dictionary
             payload = {
                 "Page": {
-                    "totalRecords": queryset.count(),  # Use count() instead of len()
+                    "totalRecords": queryset.count(),
                     "current": page_obj.number,
                     "next": page_obj.has_next(),
                     "previous": page_obj.has_previous(),
                     "totalPages": page_obj.paginator.num_pages,
                 },
-                "Result": serializer.data,  # Include the serialized data
+                "Result": result_data,
             }
-
-            return Response(
-                payload,
-                status=status.HTTP_200_OK,
-            )
+            return Response(payload, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -530,101 +688,11 @@ class StaffRelationshipManagementView(APIView):
         )
 
 
-############################################################################################################################
-
-
-# Add Drug
-class DrugInventoryManagement(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request, *args, **kwargs):
-        data = {
-            "drug_name": request.data.get("drug_name"),
-            "company": request.data.get("company"),
-            "generic_name": request.data.get("generic_name"),
-            "quantity": request.data.get("quantity"),
-            "unit_price": request.data.get("unit_price"),
-            "user": request.user.id,
-        }
-
-        serializer = DrugSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    # View Drug information List
-    def get(self, request, *args, **kwargs):
-        try:
-            queryset = (
-                Drug.objects.filter(user=request.user.id)
-                .order_by("-created_at")
-                .values()
-            )
-
-            # Applying pagination
-            set_limit = self.request.GET.get("limit")
-            paginator = Paginator(queryset, set_limit)
-            page_number = self.request.data.get("page")
-
-            page_obj = paginator.get_page(page_number)
-            serializer = DrugSerializer(page_obj.object_list, many=True)
-
-            # result dictionary
-            payload = {
-                "Page": {
-                    "totalRecords": queryset.count(),
-                    "current": page_obj.number,
-                    "next": page_obj.has_next(),
-                    "previous": page_obj.has_previous(),
-                    "totalPages": page_obj.paginator.num_pages,
-                },
-                "Result": serializer.data,
-            }
-
-            return Response(
-                payload,
-                status=status.HTTP_200_OK,
-            )
-
-        except Exception as e:
-            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Update clinic data
-    def put(self, request, token, *args, **kwargs):
-        try:
-            drug = Drug.objects.get(token=token)
-        except Drug.DoesNotExist:
-            return Response(
-                {"error": "Drug not found."}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        serializer = DrugSerializer(drug, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    # Delete clinic data
-    def delete(self, request, token, *args, **kwargs):
-        try:
-            drug_data = Drug.objects.get(token=token)
-        except Drug.DoesNotExist:
-            return Response(
-                {"error": "Drug not found."}, status=status.HTTP_404_NOT_FOUND
-            )
-        drug_data.delete()
-        return Response(
-            data={"message": "Data deleted successfully"},
-            status=status.HTTP_204_NO_CONTENT,
-        )
-
 
 ############################################################################################################################
 
 
+# Appointment view
 class AppointmentManagement(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -645,20 +713,20 @@ class AppointmentManagement(APIView):
             "status": request.data.get("status"),
             "procedures": request.data.get("procedures"),
         }
-        
 
         # Fetching data
-        queryset = ClinicMember.objects.filter(staff_id=data.get("relatedRecipient")).values('first_name', 'last_name', 'email', 'contact_number')[0]
-        print(queryset)
-        print(type(queryset))
-        relatedRecipient_contact_number = queryset.get("contact_number")
+        queryset = ClinicMember.objects.filter(
+            staff_id=data.get("relatedRecipient")
+        ).values("first_name", "last_name", "email", "contact_number")[0]
+
         # Sending Email Notifications
         send_email_notification_to_staff(queryset)
         send_email_notification_to_patient(data, queryset)
-        
+
         # Sending SMS Notifications
-        send_sms_notification(data, queryset)
-        
+        send_sms_notification_staff_member(queryset)
+        send_sms_notification_patient(data, queryset)
+
         serializer = AppointmentSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -688,7 +756,11 @@ class AppointmentManagement(APIView):
             }
 
             # Parsing key and value into conditional filter
-            filters = {field: value for field, value in filter_params.items() if value is not None}
+            filters = {
+                field: value
+                for field, value in filter_params.items()
+                if value is not None
+            }
 
             if filters:
                 queryset = queryset.filter(**filters)
