@@ -4,12 +4,16 @@ from .models import (
     Clinic,
     ClinicMember,
     PatientAppointment,
+    PharmacyInventory,
+    Prescription,
 )
 from .serializer import (
     ClinicSerializer,
     CustomSerializer,
     ClinicStaffSerializer,
     AppointmentSerializer,
+    PharmacyInventorySerializer,
+    PrescriptionSerializer,
 )
 from .emails import (
     send_email_notification,
@@ -48,7 +52,9 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 
 # External Django libraries and modules
-
+from django.http import FileResponse
+from reportlab.pdfgen import canvas
+from io import BytesIO
 from datetime import date
 from datetime import timedelta
 from django.db.models import Q
@@ -125,8 +131,7 @@ class SignupView(APIView):
             user.save()
 
             # Generate and send the 6 digit OTP to the user's email address
-            OTP_length = 8
-            OTP = generate_time_based_otp(OTP_length)
+            OTP = generate_time_based_otp()
 
             # Store the email and generated OTP in the session or any other storage
             request.session["email"] = email
@@ -460,13 +465,16 @@ class ClinicListView(APIView):
         permissions.AllowAny,
     ]
 
+    # ADD
     def post(self, request, *args, **kwargs):
         data = {
             "clinic_name": request.data.get("clinic_name"),
             "contact_number": request.data.get("mobile_number"),
             "address": request.data.get("address"),
             "city": request.data.get("city"),
+            "zipcode": request.data.get("zipcode"),
             "country": request.data.get("country"),
+            "avatar": request.data.get("avatar"),
             "email": request.data.get("email"),
             "status": request.data.get("status"),
             "user": request.user.id,
@@ -478,7 +486,8 @@ class ClinicListView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
+    # VIEW
     def get(self, request, *args, **kwargs):
         try:
             queryset = Clinic.objects.all().order_by("-created_at").values()
@@ -528,6 +537,20 @@ class ClinicListView(APIView):
             )
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    # DELETE
+    def delete(self, request, clinic_id, *args, **kwargs):
+        try:
+            member_data = Clinic.objects.get(clinic_id=clinic_id)
+        except Clinic.DoesNotExist:
+            return Response(
+                {"error": "Clinic not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        member_data.delete()
+        return Response(
+            data={"message": "Clinic data deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT,
+        )
 
 
 ############################################################################################################################
@@ -821,3 +844,217 @@ class AppointmentManagement(APIView):
             data={"message": "Data deleted successfully"},
             status=status.HTTP_204_NO_CONTENT,
         )
+
+
+############################################################################################################################
+
+class PharmacyInventoryManagement(APIView):
+    # ADD DRUG
+    def post(self, request):
+        data = {
+            "drug_name": request.data.get("drug_name"),
+            "generic_name": request.data.get("generic_name"),
+            "brand_name": request.data.get("brand_name"),
+            "drug_class": request.data.get("drug_class"),
+            "dosage_form": request.data.get("dosage_form"),
+            "unit_price": request.data.get("unit_price"),
+            "quantity": request.data.get("quantity"),
+            "manufacture_date": request.data.get("manufacture_date"),
+            "lifetime_in_months": request.data.get("lifetime_in_months"),
+            "expiry_date": request.data.get("expiry_date"),
+        }
+        
+        serializer = PharmacyInventorySerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # View appointment List
+    def get(self, request, *args, **kwargs):
+        try:
+            queryset = PharmacyInventory.objects.all().order_by("-added_at")
+
+            # filter and Search function for list
+            filter_params = {
+                "drug_id": self.request.GET.get("drug_id"),
+                "drug_name": self.request.GET.get("drug_name"),
+                "generic_name": self.request.GET.get("generic_name"),
+                "brand_name": self.request.GET.get("brand_name"),
+                "drug_class": self.request.GET.get("drug_class"),
+                "dosage_form": self.request.GET.get("dosage_form"),
+                "unit_price": self.request.GET.get("unit_price"),
+                "quantity": self.request.GET.get("quantity"),
+                "manufacture_date": self.request.GET.get("manufacture_date"),
+                "lifetime_in_months": self.request.GET.get("lifetime_in_months"),
+                "expiry_date": self.request.GET.get("expiry_date"),
+                "added_at": self.request.GET.get("added_at"),
+            }
+
+            # Parsing key and value into conditional filter
+            filters = {
+                field: value
+                for field, value in filter_params.items()
+                if value is not None
+            }
+
+            if filters:
+                queryset = queryset.filter(**filters)
+
+            # Applying pagination
+            set_limit = self.request.GET.get("limit")
+            paginator = Paginator(queryset, set_limit)
+            page_number = self.request.GET.get("page")
+            # Use GET instead of data to retrieve the page number
+            page_obj = paginator.get_page(page_number)
+            serializer = PharmacyInventorySerializer(page_obj, many=True)
+
+            # result dictionary
+            payload = {
+                "Page": {
+                    "totalRecords": queryset.count(),
+                    "current": page_obj.number,
+                    "next": page_obj.has_next(),
+                    "previous": page_obj.has_previous(),
+                    "totalPages": page_obj.paginator.num_pages,
+                },
+                "Result": serializer.data,
+            }
+            return Response(
+                payload,
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+        
+############################################################################################################################
+
+class PrescriptionManagement(APIView):
+    # Create a new Prescription
+    def post(self, request):
+        data = {
+            "clinic_name": request.data.get("clinic_name"),
+            "consultant": request.data.get("consultant"),
+            "appointment_id": request.data.get("appointment_id"),
+            "patient_first_name": request.data.get("patient_first_name"),
+            "patient_last_name": request.data.get("patient_last_name"),
+            "age": request.data.get("age"),
+            "medication": request.data.get("medication"),
+            "dosage_freq": request.data.get("dosage_freq"),
+            "quantity": request.data.get("quantity"),
+            "description": request.data.get("description"),
+        }
+        
+        serializer = PrescriptionSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # View Prescription
+    def get(self, request, *args, **kwargs):
+        try:
+            queryset = Prescription.objects.all().order_by("-created_at")
+
+            # filter and Search function for list
+            filter_params = {
+                "prescription_id": self.request.GET.get("prescription_id"),
+                "clinic_name": self.request.GET.get("clinic_name"),
+                "consultant": self.request.GET.get("consultant"),
+                "appointment_id": self.request.GET.get("appointment_id"),
+                "patient_first_name": self.request.GET.get("patient_first_name"),
+                "patient_last_name": self.request.GET.get("patient_last_name"),
+                "age": self.request.GET.get("age"),
+                "medication": self.request.GET.get("medication"),
+                "dosage_freq": self.request.GET.get("dosage_freq"),
+                "quantity": self.request.GET.get("quantity"),
+                "description": self.request.GET.get("description"),
+                "created_at": self.request.GET.get("created_at"),
+            }
+            
+            # Parsing key and value into conditional filter
+            filters = {
+                field: value
+                for field, value in filter_params.items()
+                if value is not None
+            }
+
+            if filters:
+                queryset = queryset.filter(**filters)
+
+            # Applying pagination
+            set_limit = self.request.GET.get("limit")
+            paginator = Paginator(queryset, set_limit)
+            page_number = self.request.GET.get("page")
+            # Use GET instead of data to retrieve the page number
+            page_obj = paginator.get_page(page_number)
+            serializer = PrescriptionSerializer(page_obj, many=True)
+
+            # result dictionary
+            payload = {
+                "Page": {
+                    "totalRecords": queryset.count(),
+                    "current": page_obj.number,
+                    "next": page_obj.has_next(),
+                    "previous": page_obj.has_previous(),
+                    "totalPages": page_obj.paginator.num_pages,
+                },
+                "Result": serializer.data,
+            }
+            return Response(
+                payload,
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+        
+#########################################################
+        
+# Download prescriptions
+class PrescriptionPDFView(APIView):
+    def get(self, request, prescription_id, *args, **kwargs):
+        try:
+            # Retrieve the prescription object from the database
+            prescription = Prescription.objects.get(prescription_id=prescription_id)
+
+            # Create a BytesIO buffer to store the PDF file
+            buffer = BytesIO()
+
+            # Create the PDF object and specify the buffer as its output
+            p = canvas.Canvas(buffer)
+
+            # Generate the content of the PDF
+            p.drawString(100, 750, f"Prescription ID: {prescription.prescription_id}")
+            p.drawString(100, 700, f"Patient Name: {prescription.patient_first_name} {prescription.patient_last_name}")
+            p.drawString(100, 650, f"Clinic Name: {prescription.clinic_name}")
+            p.drawString(100, 600, f"Consultant Name: Dr.{prescription.consultant}")
+            p.drawString(100, 550, f"Medication: {prescription.medication}")
+            p.drawString(100, 500, f"Dosage Frequency: {prescription.dosage_freq}")
+            p.drawString(100, 450, f"Medication: {prescription.quantity}")
+            p.drawString(100, 400, f"Dosage Frequency: {prescription.description}")
+
+            # Add more fields and information as needed
+
+            # Save the PDF to the buffer
+            p.showPage()
+            p.save()
+
+            # Rewind the buffer to the beginning
+            buffer.seek(0)
+
+            # Create the FileResponse object with the appropriate PDF headers
+            response = FileResponse(buffer, as_attachment=True, filename=f"prescription_{prescription.prescription_id}.pdf")
+
+            return response
+
+        except Prescription.DoesNotExist:
+            return Response(data={"error": "Prescription not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

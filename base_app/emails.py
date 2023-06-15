@@ -11,18 +11,41 @@ def send_email_notification(recipient_list, fetched_activation_OTP):
     
     email_from = settings.DEFAULT_FROM_EMAIL
     subject = "Account Update Notification"
-    message = f"""
-    Hi, 
-    
-    Your Account activation key is {fetched_activation_OTP}.
-    Enter the key on registration form.
-     
-    Thanks! Regards.
-    TestProject Support Team
+    html_body = f"""
+<div style="font-family: Helvetica,Arial,sans-serif;min-width:1000px;overflow:auto;line-height:2">
+  <div style="margin:50px auto;width:70%;padding:20px 0">
+    <div style="border-bottom:1px solid #eee;display:flex;align-items:center;">
+      <div style="transform: rotate(-90deg);margin-right:10px;">
+        <img src="../media/SHIPSY_LOGO_BIRD_BLUE.png" alt="Brand Logo" width="50">
+      </div>
+      <a href="" style="font-size:1.4em;color: #00466a;text-decoration:none;font-weight:600;white-space: nowrap;">TestProject</a>
+    </div>
+    <p style="font-size:1.1em">Hi,</p>
+    <p>Thank you for choosing TestProject. Use the following OTP to complete your Sign Up procedures. OTP is valid for 10 minutes</p>
+    <h2 style="background: #00466a;margin: 0 auto;width: max-content;padding: 0 10px;color: #fff;border-radius: 4px;">{fetched_activation_OTP}</h2>
+    <p style="font-size:0.9em;">Regards,<br />TestProject</p>
+    <hr style="border:none;border-top:1px solid #eee" />
+    <div style="float:right;padding:8px 0;color:#aaa;font-size:0.8em;line-height:1;font-weight:300">
+      <p>TestProject Inc</p>
+      <p>Madrid</p>
+      <p></p>
+    </div>
+  </div>
+</div>
     """
-    send_mail(subject, message, email_from, recipient_list)
+    send_mail(subject, html_body, email_from, recipient_list)
 
     return True
+
+
+
+
+
+
+
+
+
+
 
 
 # Email notification If user changes Profile information

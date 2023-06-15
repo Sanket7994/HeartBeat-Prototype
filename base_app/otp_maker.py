@@ -5,11 +5,11 @@ import datetime
 
 secret_key = ''
 
-def generate_time_based_otp(OTP_length):
+def generate_time_based_otp():
     global secret_key
     # Generate random secret key if it's empty
     if not secret_key:
-        secret_key = ''.join(random.choices(string.ascii_letters + string.digits, k=OTP_length))
+        secret_key = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
     # Create TOTP object with validity of 10 mins
     totp = pyotp.TOTP(secret_key, interval=600)
     # Generate OTP

@@ -1,7 +1,8 @@
 # Imports
 import uuid
 from django.utils import timezone
-from datetime import time
+from datetime import time, date, timedelta
+import datetime
 from school import settings
 from PIL import Image
 from django.db import models
@@ -15,6 +16,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from phonenumber_field.modelfields import PhoneNumberField
 from django.core.validators import RegexValidator
+from django_resized import ResizedImageField
 
 
 # Custom User Model
@@ -56,7 +58,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, blank=False, null=False)
     first_name = models.CharField(max_length=50, blank=True)
     last_name = models.CharField(max_length=50, blank=True)
-    avatar = models.ImageField(default="avatar.jpg", upload_to="profile_avatars")
+    avatar = ResizedImageField(size=[150, 150], default="avatar.jpg", upload_to="profile_avatars", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     last_login = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -74,19 +76,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
-
-    def save(self, *args, **kwargs):
-        # save the profile
-        super().save(*args, **kwargs)
-
-        # resize the profile image first
-        img = Image.open(self.avatar.path)
-        if img.height > 150 or img.width > 150:
-            output_size = (150, 150)
-            # create a thumbnail
-            img.thumbnail(output_size)
-            # overwrite the larger image
-            img.save(self.avatar.path)
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -127,7 +116,7 @@ class Clinic(models.Model):
     )
     user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True)
     clinic_name = models.CharField(max_length=100, blank=False, null=False)
-    avatar = models.ImageField(default="avatar.jpg", upload_to="profile_avatars")
+    avatar = ResizedImageField(size=[150, 150], default="avatar.jpg", upload_to="profile_avatars", blank=True, null=True)
     contact_number = PhoneNumberField(
         blank=True,
         null=True,
@@ -136,6 +125,7 @@ class Clinic(models.Model):
     )
     address = models.CharField(max_length=250, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
+    zipcode = models.IntegerField(blank=True, null=True)
     country = models.CharField(
         max_length=100, choices=Country.choices, default=None, null=True
     )
@@ -144,7 +134,10 @@ class Clinic(models.Model):
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
     last_updated = models.DateTimeField(auto_now=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    def __str__(self):
+        return self.clinic_name
 
     def save(self, *args, **kwargs):
         if not self.clinic_id:
@@ -156,22 +149,6 @@ class Clinic(models.Model):
                     self.clinic_id = new_clinic_id
                     break
         super().save(*args, **kwargs)
-
-    def save(self, *args, **kwargs):
-        # save the profile
-        super().save(*args, **kwargs)
-
-        # resize the profile image first
-        img = Image.open(self.avatar.path)
-        if img.height > 150 or img.width > 150:
-            output_size = (150, 150)
-            # create a thumbnail
-            img.thumbnail(output_size)
-            # overwrite the larger image
-            img.save(self.avatar.path)
-
-    def __str__(self):
-        return self.clinic_name
 
 
 # clinic Members
@@ -223,7 +200,7 @@ class ClinicMember(models.Model):
     clinic_name = models.ForeignKey(Clinic, on_delete=models.SET_NULL, null=True)
     first_name = models.CharField(max_length=100, blank=False, null=False)
     last_name = models.CharField(max_length=100, blank=False, null=False)
-    avatar = models.ImageField(default="avatar.jpg", upload_to="profile_avatars")
+    avatar = ResizedImageField(size=[150, 150], default="avatar.jpg", upload_to="profile_avatars", blank=True, null=True)
     designation = models.CharField(
         max_length=100, choices=StaffDesignation.choices, default=None, null=True
     )
@@ -241,8 +218,11 @@ class ClinicMember(models.Model):
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
     last_updated = models.DateTimeField(auto_now=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+    
     def save(self, *args, **kwargs):
         if not self.staff_id:
             while True:
@@ -251,22 +231,6 @@ class ClinicMember(models.Model):
                     self.staff_id = new_staff_id
                     break
         super().save(*args, **kwargs)
-
-    def save(self, *args, **kwargs):
-        # save the profile
-        super().save(*args, **kwargs)
-
-        # resize the profile image first
-        img = Image.open(self.avatar.path)
-        if img.height > 150 or img.width > 150:
-            output_size = (150, 150)
-            # create a thumbnail
-            img.thumbnail(output_size)
-            # overwrite the larger image
-            img.save(self.avatar.path)
-
-    def __str__(self):
-        return f"{self.first_name} {self.last_name}"
 
 
 # Create appointments
@@ -285,11 +249,10 @@ class PatientAppointment(models.Model):
         if value < timezone.now().date():
             raise ValidationError(_("Invalid date."))
 
-    def validate_weekday(self):
-        if (
-            self.appointment_date.weekday() >= 5): 
-            raise ValidationError(_("Appointments are not available on weekends"))
-
+    def validate_weekday(value):
+        if value.weekday() >= 5:
+            raise ValidationError(_("Appointments are not available on weekends."))
+        
     appointment_id = models.CharField(
         primary_key=True,
         max_length=50,
@@ -314,6 +277,8 @@ class PatientAppointment(models.Model):
     gender = models.CharField(
         max_length=100, choices=Gender.choices, default=None, null=True
     )
+    date_of_birth = models.DateField(blank=True, null=True)
+    age = models.IntegerField(blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     contact_number = PhoneNumberField(
         blank=True,
@@ -331,18 +296,173 @@ class PatientAppointment(models.Model):
     status = models.CharField(
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def save(self, *args, **kwargs):
-        if not self.appointment_id:
-            while True:
-                new_appointment_id = str(uuid.uuid4().hex[:10].upper())
-                if not PatientAppointment.objects.filter(
-                    appointment_id=new_appointment_id
-                ).exists():
-                    self.appointment_id = new_appointment_id
-                    break
-        super().save(*args, **kwargs)
+    last_updated = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
     def __str__(self):
         return self.appointment_id
+
+    def save(self, *args, **kwargs):
+        if self.date_of_birth:
+            today = date.today()
+            age = today.year - self.date_of_birth.year
+
+            # Check if the birthday has already occurred this year
+            if today.month < self.date_of_birth.month or (today.month == self.date_of_birth.month and today.day < self.date_of_birth.day):
+                age -= 1
+
+            self.age = age
+
+        if not self.appointment_id:
+            while True:
+                new_appointment_id = str(uuid.uuid4().hex[:10].upper())
+                if not PatientAppointment.objects.filter(appointment_id=new_appointment_id).exists():
+                    self.appointment_id = new_appointment_id
+                    break
+
+        super(PatientAppointment, self).save(*args, **kwargs)
+        
+
+# Pharmacy Drug Inventory
+class PharmacyInventory(models.Model):
+    class DosageType(models.TextChoices):
+        ORAL = "ORAL", "Oral"
+        OPHTHALMIC = "OPHTHALMIC", "Ophthalmic"
+        INHALATION = "INHALATION", "Inhalation"
+        INJECTION = "INJECTION", "Injection"
+        TOPICAL = "TOPICAL", "Topical"
+        OTHER = "OTHER", "Other"
+
+    class GeneralDrugClass(models.TextChoices):
+        ANALGESICS = "ANALGESICS", "ANALGESICS: Used for headaches, muscle pain, toothaches, menstrual pain"
+        ANTIPYRETICS = "ANTIPYRETICS", "ANTIPYRETICS: Used to reduce fever"
+        ANTACIDS = "ANTACIDS", "ANTACIDS: Used for heartburn, indigestion, acid reflux"
+        ANTIHISTAMINES = "ANTIHISTAMINES", "ANTIHISTAMINES: Used for allergies, itchy skin or eyes, sneezing, runny nose"
+        COUGH_AND_COLD = "COUGH_AND_COLD", "COUGH_AND_COLD: Used for cough relief, nasal congestion, sore throat"
+        TOPICAL_ANALGESICS = "TOPICAL_ANALGESICS", "TOPICAL_ANALGESICS: Used for muscle aches and strains, joint pain, minor injuries"
+        ANTIDIARRHEALS = "ANTIDIARRHEALS", "ANTIDIARRHEALS: Used for diarrhea relief"
+        DERMATOLOGICAL = "DERMATOLOGICAL", "DERMATOLOGICAL: Used for acne treatment, eczema or dermatitis management, fungal infections"
+        ORAL_CONTRACEPTIVES = "ORAL_CONTRACEPTIVES", "ORAL_CONTRACEPTIVES: Used for pregnancy prevention"
+        OPHTHALMIC = "OPHTHALMIC", "OPHTHALMIC: Used for eye infections, dry eyes, allergic conjunctivitis"
+        OTHER = "OTHER", "Other"
+        
+    drug_id = models.CharField(
+        primary_key=True,
+        max_length=50,
+        editable=False,
+        unique=True,
+        default=uuid.uuid4,
+    )
+    drug_name = models.CharField(max_length=250, unique=True)
+    generic_name = models.CharField(max_length=250)
+    brand_name = models.CharField(max_length=250)
+    drug_class = models.CharField(
+        choices=GeneralDrugClass.choices,
+        default=GeneralDrugClass.OTHER,
+        max_length=250,
+    )
+    dosage_form = models.CharField(
+        choices=DosageType.choices,
+        default=DosageType.OTHER,
+        max_length=250,
+    )
+    unit_price = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    quantity = models.PositiveIntegerField(default=0)
+    manufacture_date = models.DateField(default=timezone.now)
+    lifetime_in_months = models.PositiveIntegerField(default=0, )
+    expiry_date = models.DateField(default=None, blank=True, null=True)
+    added_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    def __str__(self):
+        return self.drug_name
+    
+    def save(self, *args, **kwargs):
+        if self.manufacture_date and self.lifetime_in_months:
+            expiry_date = self.manufacture_date + timedelta(days=30 * self.lifetime_in_months)
+            self.expiry_date = expiry_date
+            
+        if not self.drug_id:
+            while True:
+                new_drug_id = str(uuid.uuid4().upper())
+                if not PharmacyInventory.objects.filter(drug_id=new_drug_id).exists():
+                    self.drug_id = new_drug_id
+                    break
+        super().save(*args, **kwargs)
+        
+
+
+# Patient`s Prescription Model
+class Prescription(models.Model):
+    class DosingFrequency(models.TextChoices):
+        ONCE_A_DAY = "ONCE_A_DAY", "Once a day"
+        TWICE_A_DAY = "TWICE_A_DAY", "Twice a day"
+        THRICE_A_DAY = "THRICE_A_DAY", "Thrice a day"
+        FLEXIBLE = "FLEXIBLE", "Flexible timings"
+
+    prescription_id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+    )
+    clinic_name = models.ForeignKey(
+        Clinic,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="prescriptions",
+    )
+    consultant = models.ForeignKey(
+        ClinicMember,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="prescriptions",
+    )
+    appointment_id = models.ForeignKey(
+        PatientAppointment,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="prescriptions",
+    )
+    patient_first_name = models.CharField(max_length=250)
+    patient_last_name = models.CharField(max_length=250)
+    age = models.PositiveIntegerField(default=0)
+    medication = models.ManyToManyField(
+        PharmacyInventory,
+        related_name="prescriptions",
+    )
+    dosage_freq = models.CharField(
+        choices=DosingFrequency.choices,
+        default=DosingFrequency.FLEXIBLE,
+        max_length=250,
+        null=True,
+    )
+    quantity = models.PositiveIntegerField(default=0)
+    description = models.TextField(max_length=300, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    def __str__(self):
+        return str(self.prescription_id)
+
+    def save(self, *args, **kwargs):
+        if not self.prescription_id:
+            while True:
+                new_prescription_id = uuid.uuid4()
+                if not Prescription.objects.filter(prescription_id=new_prescription_id).exists():
+                    self.prescription_id = new_prescription_id
+                    break
+        super().save(*args, **kwargs)
+
+
+
+    
+    
+    
+    
+    
+    
+    
+    
+
+
+
+
