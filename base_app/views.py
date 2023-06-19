@@ -6,6 +6,7 @@ from .models import (
     PatientAppointment,
     PharmacyInventory,
     Prescription,
+    PrescribedMedication,
 )
 from .serializer import (
     ClinicSerializer,
@@ -14,6 +15,7 @@ from .serializer import (
     AppointmentSerializer,
     PharmacyInventorySerializer,
     PrescriptionSerializer,
+    PrescribedMedicationSerializer,
 )
 from .emails import (
     send_email_notification,
@@ -52,12 +54,8 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 
 # External Django libraries and modules
-from django.http import FileResponse
-from reportlab.pdfgen import canvas
-from io import BytesIO
 from datetime import date
 from datetime import timedelta
-from django.db.models import Q
 from django.dispatch import Signal
 from django.core.paginator import Paginator, EmptyPage
 from django.shortcuts import get_object_or_404
@@ -65,7 +63,6 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.tokens import default_token_generator
 
 
@@ -173,13 +170,17 @@ class ResendOTP(APIView):
 
                 return Response(
                     data={
-                        "message": f"Attempt: {count} of 3: Email with a 6-digit OTP has been sent to {stored_email}. Please check your email."}, 
-                    status=status.HTTP_200_OK,)
+                        "message": f"Attempt: {count} of 3: Email with a 6-digit OTP has been sent to {stored_email}. Please check your email."
+                    },
+                    status=status.HTTP_200_OK,
+                )
             else:
                 return Response(
                     data={
-                        "message": "Maximum number of OTP resend attempts reached. Please contact support for assistance."}, 
-                    status=status.HTTP_429_TOO_MANY_REQUESTS,)
+                        "message": "Maximum number of OTP resend attempts reached. Please contact support for assistance."
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -192,11 +193,14 @@ class VerifyOTPView(APIView):
         serializer = VerifyOTPSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             otp = serializer.validated_data["otp"]
-            
+
         if is_otp_valid(otp) != True:
             return Response(
-                        data={"error_message": "OTP Expired. Try Again as It`s only valid for 10 mins!"}, 
-                        status=status.HTTP_200_OK,)
+                data={
+                    "error_message": "OTP Expired. Try Again as It`s only valid for 10 mins!"
+                },
+                status=status.HTTP_200_OK,
+            )
 
         # Retrieve the email and OTP from the session or any other storage
         stored_email = request.session.get("email")
@@ -217,7 +221,8 @@ class VerifyOTPView(APIView):
 
                     return Response(
                         data={
-                            "error_message": "Account verified successfully. You can now log in."}, 
+                            "error_message": "Account verified successfully. You can now log in."
+                        },
                         status=status.HTTP_200_OK,
                     )
         except Exception as e:
@@ -456,14 +461,11 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-###############################################################################################
-
+############################################################################################################################
 
 # CRUD OPERATION FOR CLINIC
 class ClinicListView(APIView):
-    permission_classes = [
-        permissions.AllowAny,
-    ]
+    permission_classes = [permissions.AllowAny,]
 
     # ADD
     def post(self, request, *args, **kwargs):
@@ -486,7 +488,7 @@ class ClinicListView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     # VIEW
     def get(self, request, *args, **kwargs):
         try:
@@ -537,7 +539,7 @@ class ClinicListView(APIView):
             )
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
+
     # DELETE
     def delete(self, request, clinic_id, *args, **kwargs):
         try:
@@ -711,7 +713,6 @@ class StaffRelationshipManagementView(APIView):
         )
 
 
-
 ############################################################################################################################
 
 
@@ -848,7 +849,10 @@ class AppointmentManagement(APIView):
 
 ############################################################################################################################
 
+
 class PharmacyInventoryManagement(APIView):
+    permission_classes = [permissions.AllowAny]
+
     # ADD DRUG
     def post(self, request):
         data = {
@@ -863,14 +867,14 @@ class PharmacyInventoryManagement(APIView):
             "lifetime_in_months": request.data.get("lifetime_in_months"),
             "expiry_date": request.data.get("expiry_date"),
         }
-        
+
         serializer = PharmacyInventorySerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     # View appointment List
     def get(self, request, *args, **kwargs):
         try:
@@ -928,33 +932,31 @@ class PharmacyInventoryManagement(APIView):
 
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
-        
+
+
 ############################################################################################################################
 
+# Prescription Creation View
 class PrescriptionManagement(APIView):
+    permission_classes = [permissions.AllowAny]
+
     # Create a new Prescription
     def post(self, request):
         data = {
             "clinic_name": request.data.get("clinic_name"),
             "consultant": request.data.get("consultant"),
             "appointment_id": request.data.get("appointment_id"),
-            "patient_first_name": request.data.get("patient_first_name"),
-            "patient_last_name": request.data.get("patient_last_name"),
-            "age": request.data.get("age"),
-            "medication": request.data.get("medication"),
-            "dosage_freq": request.data.get("dosage_freq"),
-            "quantity": request.data.get("quantity"),
+            "medications": request.data.get("medication"),
             "description": request.data.get("description"),
         }
-        
+
         serializer = PrescriptionSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     # View Prescription
     def get(self, request, *args, **kwargs):
         try:
@@ -966,16 +968,11 @@ class PrescriptionManagement(APIView):
                 "clinic_name": self.request.GET.get("clinic_name"),
                 "consultant": self.request.GET.get("consultant"),
                 "appointment_id": self.request.GET.get("appointment_id"),
-                "patient_first_name": self.request.GET.get("patient_first_name"),
-                "patient_last_name": self.request.GET.get("patient_last_name"),
-                "age": self.request.GET.get("age"),
-                "medication": self.request.GET.get("medication"),
-                "dosage_freq": self.request.GET.get("dosage_freq"),
-                "quantity": self.request.GET.get("quantity"),
+                "medications": self.request.GET.get("medication"),
                 "description": self.request.GET.get("description"),
                 "created_at": self.request.GET.get("created_at"),
             }
-            
+
             # Parsing key and value into conditional filter
             filters = {
                 field: value
@@ -1012,49 +1009,75 @@ class PrescriptionManagement(APIView):
 
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
-        
-#########################################################
-        
-# Download prescriptions
-class PrescriptionPDFView(APIView):
+
+
+# View alloted medication in all prescriptions
+class PrescribedMedicationHistory(APIView):
+    permission_classes = [permissions.AllowAny]
+    
     def get(self, request, prescription_id, *args, **kwargs):
         try:
-            # Retrieve the prescription object from the database
-            prescription = Prescription.objects.get(prescription_id=prescription_id)
+            queryset = PrescribedMedication.objects.filter(for_prescription_id=prescription_id)
 
-            # Create a BytesIO buffer to store the PDF file
-            buffer = BytesIO()
+            # Applying pagination
+            set_limit = self.request.GET.get("limit")
+            paginator = Paginator(queryset, set_limit)
+            page_number = self.request.GET.get("page")
+            # Use GET instead of data to retrieve the page number
+            page_obj = paginator.get_page(page_number)
+            serializer = PrescribedMedicationSerializer(page_obj, many=True)
 
-            # Create the PDF object and specify the buffer as its output
-            p = canvas.Canvas(buffer)
-
-            # Generate the content of the PDF
-            p.drawString(100, 750, f"Prescription ID: {prescription.prescription_id}")
-            p.drawString(100, 700, f"Patient Name: {prescription.patient_first_name} {prescription.patient_last_name}")
-            p.drawString(100, 650, f"Clinic Name: {prescription.clinic_name}")
-            p.drawString(100, 600, f"Consultant Name: Dr.{prescription.consultant}")
-            p.drawString(100, 550, f"Medication: {prescription.medication}")
-            p.drawString(100, 500, f"Dosage Frequency: {prescription.dosage_freq}")
-            p.drawString(100, 450, f"Medication: {prescription.quantity}")
-            p.drawString(100, 400, f"Dosage Frequency: {prescription.description}")
-
-            # Add more fields and information as needed
-
-            # Save the PDF to the buffer
-            p.showPage()
-            p.save()
-
-            # Rewind the buffer to the beginning
-            buffer.seek(0)
-
-            # Create the FileResponse object with the appropriate PDF headers
-            response = FileResponse(buffer, as_attachment=True, filename=f"prescription_{prescription.prescription_id}.pdf")
-
-            return response
-
-        except Prescription.DoesNotExist:
-            return Response(data={"error": "Prescription not found"}, status=status.HTTP_404_NOT_FOUND)
-
+            # result dictionary
+            payload = {
+                "Page": {
+                    "totalRecords": queryset.count(),
+                    "current": page_obj.number,
+                    "next": page_obj.has_next(),
+                    "previous": page_obj.has_previous(),
+                    "totalPages": page_obj.paginator.num_pages,
+                },
+                "Result": serializer.data,
+            }
+            return Response(
+                payload,
+                status=status.HTTP_200_OK,
+            )
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+############################################################################################################################
+
+# To dynamically update prescription receipt data to frontend
+
+class PrescriptionInvoiceView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    # Fetch data for prescription
+    def get(self, request, prescription_id, *args, **kwargs):
+        try:
+            prescription = Prescription.objects.filter(prescription_id=prescription_id).values().first()
+            prescribed_meds = PrescribedMedication.objects.filter(for_prescription_id=prescription_id).values()
+            appointment = PatientAppointment.objects.filter(appointment_id=prescription['appointment_id_id']).values().first()
+            staff = ClinicMember.objects.filter(staff_id=str(appointment['relatedRecipient_id'])).values().first()
+            clinic = Clinic.objects.filter(clinic_id=str(staff['clinic_name_id'])).values().first()
+
+            # Convert prescribed_meds QuerySet to a list of dictionaries
+            prescribed_meds_list = list(prescribed_meds)
+
+            # Merge all the dictionaries
+            prescription_dict = {
+                **prescription,
+                'prescribed_meds': prescribed_meds_list,
+                **appointment,
+                **staff,
+                **clinic,
+            }
+
+            return Response({"masterData": prescription_dict}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+############################################################################################################################
+

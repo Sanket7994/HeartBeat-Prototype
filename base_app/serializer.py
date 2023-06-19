@@ -1,6 +1,15 @@
 import string
 from rest_framework import serializers
-from .models import CustomUser, Clinic, ClinicMember, PatientAppointment, Prescription, PharmacyInventory
+from .models import (
+    CustomUser,
+    Clinic,
+    ClinicMember,
+    MedicalProceduresTypes,
+    PatientAppointment,
+    Prescription,
+    PharmacyInventory,
+    PrescribedMedication,
+)
 
 # To convert the Model object to an API-appropriate format like JSON,
 # Django REST framework uses the ModelSerializer class to convert any model to serialized JSON objects:
@@ -93,13 +102,24 @@ class ClinicStaffSerializer(serializers.ModelSerializer):
         )
 
 
-# Appointment Information
+# Choices for appointment related medical procedures
+class MedicalProceduresTypesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicalProceduresTypes
+        fields = ('procedure_choice',)
+
+
+# Appointment model serializer
 class AppointmentSerializer(serializers.ModelSerializer):
     created_at = serializers.ReadOnlyField()
-
+    procedures = serializers.SerializerMethodField()  
     class Meta:
         model = PatientAppointment
-        fields = "__all__"
+        fields = '__all__'
+
+    def get_procedures(self, obj):
+        return [procedure.procedure_choice for procedure in obj.procedures.all()]
+
 
 # Drug Inventory Information
 class PharmacyInventorySerializer(serializers.ModelSerializer):
@@ -107,25 +127,24 @@ class PharmacyInventorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PharmacyInventory
-        fields = (
-            "drug_id",
-            "drug_name",
-            "generic_name",
-            "brand_name",
-            "drug_class",
-            "dosage_form",
-            "unit_price",
-            "quantity",
-            "manufacture_date",
-            "lifetime_in_months",
-            "expiry_date",
-            "added_at",
-        )
-        
-# Drug Inventory Information
+        fields = "__all__"
+
+
+
+# Prescribed medical information with quality
+class PrescribedMedicationSerializer(serializers.ModelSerializer):
+    medicine_name = serializers.CharField(source="medicine.drug_name")
+    prescription_id = serializers.CharField(source="for_prescription.prescription_id")
+    class Meta:
+        model = PrescribedMedication
+        depth = 1
+        fields = ("prescription_id", "medicine_id", "medicine_name", "quantity", "dosage_freq") 
+
+
+# Prescription Information
 class PrescriptionSerializer(serializers.ModelSerializer):
     created_at = serializers.ReadOnlyField()
-
+    medications = PrescribedMedicationSerializer(many=True)
     class Meta:
         model = Prescription
         fields = (
@@ -133,13 +152,10 @@ class PrescriptionSerializer(serializers.ModelSerializer):
             "clinic_name",
             "consultant",
             "appointment_id",
-            "patient_first_name",
-            "patient_last_name",
-            "age",
-            "medication",
-            "dosage_freq",
-            "quantity",
+            "medications",
             "description",
             "created_at",
         )
+
+
 

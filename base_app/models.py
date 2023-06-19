@@ -17,6 +17,9 @@ from django.utils.translation import gettext_lazy as _
 from phonenumber_field.modelfields import PhoneNumberField
 from django.core.validators import RegexValidator
 from django_resized import ResizedImageField
+import json
+from django.core.serializers import serialize
+from django.db import models
 
 
 # Custom User Model
@@ -58,7 +61,13 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, blank=False, null=False)
     first_name = models.CharField(max_length=50, blank=True)
     last_name = models.CharField(max_length=50, blank=True)
-    avatar = ResizedImageField(size=[150, 150], default="avatar.jpg", upload_to="profile_avatars", blank=True, null=True)
+    avatar = ResizedImageField(
+        size=[150, 150],
+        default="avatar.jpg",
+        upload_to="profile_avatars",
+        blank=True,
+        null=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     last_login = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -116,7 +125,13 @@ class Clinic(models.Model):
     )
     user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True)
     clinic_name = models.CharField(max_length=100, blank=False, null=False)
-    avatar = ResizedImageField(size=[150, 150], default="avatar.jpg", upload_to="profile_avatars", blank=True, null=True)
+    avatar = ResizedImageField(
+        size=[150, 150],
+        default="avatar.jpg",
+        upload_to="profile_avatars",
+        blank=True,
+        null=True,
+    )
     contact_number = PhoneNumberField(
         blank=True,
         null=True,
@@ -200,7 +215,13 @@ class ClinicMember(models.Model):
     clinic_name = models.ForeignKey(Clinic, on_delete=models.SET_NULL, null=True)
     first_name = models.CharField(max_length=100, blank=False, null=False)
     last_name = models.CharField(max_length=100, blank=False, null=False)
-    avatar = ResizedImageField(size=[150, 150], default="avatar.jpg", upload_to="profile_avatars", blank=True, null=True)
+    avatar = ResizedImageField(
+        size=[150, 150],
+        default="avatar.jpg",
+        upload_to="profile_avatars",
+        blank=True,
+        null=True,
+    )
     designation = models.CharField(
         max_length=100, choices=StaffDesignation.choices, default=None, null=True
     )
@@ -222,7 +243,7 @@ class ClinicMember(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
-    
+
     def save(self, *args, **kwargs):
         if not self.staff_id:
             while True:
@@ -231,6 +252,33 @@ class ClinicMember(models.Model):
                     self.staff_id = new_staff_id
                     break
         super().save(*args, **kwargs)
+
+
+
+class MedicalProceduresTypes(models.Model):
+    
+    class MyChoices(models.TextChoices):
+        MEDICAL_EXAMINATION = ("MEDICAL_EXAMINATION", "Medical Examination")
+        ROUTINE_CHECK_UP = ("ROUTINE_CHECK_UP", "Routine Check-up")
+        RESULT_ANALYSIS = ("RESULT_ANALYSIS", "Result Analysis")
+        BLOOD_TESTS = ("BLOOD_TESTS", "Blood Tests")
+        X_RAY = ("X_RAY", "X-ray")
+        ULTRASOUND = ("ULTRASOUND", "Ultrasound")
+        VACCINATIONS = ("VACCINATIONS", "Vaccinations")
+        BIOPSY = ("BIOPSY", "Biopsy")
+        SURGERY = ("SURGERY", "Surgery")
+        PHYSICAL_THERAPY = ("PHYSICAL_THERAPY", "Physical Therapy")
+        HEARING_TEST = ("HEARING_TEST", "Hearing Test")
+        VISION_TEST = ("VISION_TEST", "Vision Test")
+        CARDIAC_STRESS_TEST = ("CARDIAC_STRESS_TEST", "Cardiac Stress Test")
+        ORGAN_DONATION = ("ORGAN_DONATION", "Organ Donation")
+        CONSULTATION = ("CONSULTATION", "Consultation")
+        OTHER = ("OTHER", "Other")
+        
+    procedure_choice = models.CharField(choices=MyChoices.choices, default=MyChoices.OTHER, max_length=154, unique=True)
+    
+    def __str__(self):
+        return self.procedure_choice
 
 
 # Create appointments
@@ -244,7 +292,7 @@ class PatientAppointment(models.Model):
         MALE = "MALE", "Male"
         FEMALE = "FEMALE", "Female"
         UNDISCLOSED = "UNDISCLOSED", "Undisclosed"
-
+        
     def validate_date(value):
         if value < timezone.now().date():
             raise ValidationError(_("Invalid date."))
@@ -252,7 +300,7 @@ class PatientAppointment(models.Model):
     def validate_weekday(value):
         if value.weekday() >= 5:
             raise ValidationError(_("Appointments are not available on weekends."))
-        
+
     appointment_id = models.CharField(
         primary_key=True,
         max_length=50,
@@ -278,7 +326,7 @@ class PatientAppointment(models.Model):
         max_length=100, choices=Gender.choices, default=None, null=True
     )
     date_of_birth = models.DateField(blank=True, null=True)
-    age = models.IntegerField(blank=True, null=True)
+    patient_age = models.IntegerField(blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     contact_number = PhoneNumberField(
         blank=True,
@@ -287,7 +335,7 @@ class PatientAppointment(models.Model):
         default=None,
     )
     recurring_patient = models.BooleanField(default=False)
-    procedures = models.CharField(max_length=255, default=list, blank=True, null=True)
+    procedures = models.ManyToManyField(MedicalProceduresTypes)
     appointment_date = models.DateField(
         validators=[validate_date, validate_weekday],
         default=timezone.now,
@@ -305,23 +353,26 @@ class PatientAppointment(models.Model):
     def save(self, *args, **kwargs):
         if self.date_of_birth:
             today = date.today()
-            age = today.year - self.date_of_birth.year
+            patient_age = today.year - self.date_of_birth.year
 
             # Check if the birthday has already occurred this year
-            if today.month < self.date_of_birth.month or (today.month == self.date_of_birth.month and today.day < self.date_of_birth.day):
-                age -= 1
-
-            self.age = age
+            if today.month < self.date_of_birth.month or (
+                today.month == self.date_of_birth.month
+                and today.day < self.date_of_birth.day
+            ):
+                patient_age -= 1
+            self.patient_age = patient_age
 
         if not self.appointment_id:
             while True:
                 new_appointment_id = str(uuid.uuid4().hex[:10].upper())
-                if not PatientAppointment.objects.filter(appointment_id=new_appointment_id).exists():
+                if not PatientAppointment.objects.filter(
+                    appointment_id=new_appointment_id
+                ).exists():
                     self.appointment_id = new_appointment_id
                     break
+        super().save(*args, **kwargs)
 
-        super(PatientAppointment, self).save(*args, **kwargs)
-        
 
 # Pharmacy Drug Inventory
 class PharmacyInventory(models.Model):
@@ -332,76 +383,92 @@ class PharmacyInventory(models.Model):
         INJECTION = "INJECTION", "Injection"
         TOPICAL = "TOPICAL", "Topical"
         OTHER = "OTHER", "Other"
-
+        
     class GeneralDrugClass(models.TextChoices):
-        ANALGESICS = "ANALGESICS", "ANALGESICS: Used for headaches, muscle pain, toothaches, menstrual pain"
+        ANALGESICS = ("ANALGESICS","ANALGESICS: Used for headaches, muscle pain, toothaches, menstrual pain",)
         ANTIPYRETICS = "ANTIPYRETICS", "ANTIPYRETICS: Used to reduce fever"
         ANTACIDS = "ANTACIDS", "ANTACIDS: Used for heartburn, indigestion, acid reflux"
-        ANTIHISTAMINES = "ANTIHISTAMINES", "ANTIHISTAMINES: Used for allergies, itchy skin or eyes, sneezing, runny nose"
-        COUGH_AND_COLD = "COUGH_AND_COLD", "COUGH_AND_COLD: Used for cough relief, nasal congestion, sore throat"
-        TOPICAL_ANALGESICS = "TOPICAL_ANALGESICS", "TOPICAL_ANALGESICS: Used for muscle aches and strains, joint pain, minor injuries"
+        ANTIHISTAMINES = ("ANTIHISTAMINES", "ANTIHISTAMINES: Used for allergies, itchy skin or eyes, sneezing, runny nose",)
+        COUGH_AND_COLD = ("COUGH_AND_COLD", "COUGH_AND_COLD: Used for cough relief, nasal congestion, sore throat",)
+        TOPICAL_ANALGESICS = ("TOPICAL_ANALGESICS", "TOPICAL_ANALGESICS: Used for muscle aches and strains, joint pain, minor injuries",)
         ANTIDIARRHEALS = "ANTIDIARRHEALS", "ANTIDIARRHEALS: Used for diarrhea relief"
-        DERMATOLOGICAL = "DERMATOLOGICAL", "DERMATOLOGICAL: Used for acne treatment, eczema or dermatitis management, fungal infections"
-        ORAL_CONTRACEPTIVES = "ORAL_CONTRACEPTIVES", "ORAL_CONTRACEPTIVES: Used for pregnancy prevention"
-        OPHTHALMIC = "OPHTHALMIC", "OPHTHALMIC: Used for eye infections, dry eyes, allergic conjunctivitis"
-        OTHER = "OTHER", "Other"
-        
+        DERMATOLOGICAL = ("DERMATOLOGICAL", "DERMATOLOGICAL: Used for acne treatment, eczema or dermatitis management, fungal infections",)
+        ORAL_CONTRACEPTIVES = ("ORAL_CONTRACEPTIVES", "ORAL_CONTRACEPTIVES: Used for pregnancy prevention",)
+        OPHTHALMIC = ("OPHTHALMIC","OPHTHALMIC: Used for eye infections, dry eyes, allergic conjunctivitis",)
+        OTHER = ("OTHER", "Other")
+
     drug_id = models.CharField(
         primary_key=True,
         max_length=50,
         editable=False,
-        unique=True,
-        default=uuid.uuid4,
-    )
+        unique=True,)
     drug_name = models.CharField(max_length=250, unique=True)
     generic_name = models.CharField(max_length=250)
     brand_name = models.CharField(max_length=250)
-    drug_class = models.CharField(
-        choices=GeneralDrugClass.choices,
-        default=GeneralDrugClass.OTHER,
-        max_length=250,
-    )
-    dosage_form = models.CharField(
-        choices=DosageType.choices,
-        default=DosageType.OTHER,
-        max_length=250,
-    )
+    drug_class = models.CharField(choices=GeneralDrugClass.choices, default=GeneralDrugClass.OTHER, max_length=250,)
+    dosage_form = models.CharField(choices=DosageType.choices, default=DosageType.OTHER, max_length=250,)
     unit_price = models.DecimalField(default=0, max_digits=10, decimal_places=2)
-    quantity = models.PositiveIntegerField(default=0)
+    add_quantity = models.PositiveIntegerField(default=0, help_text="add_quantity")
+    total_stock_quantity = models.PositiveIntegerField(default=0, editable=False, help_text="main_stock_quantity")
     manufacture_date = models.DateField(default=timezone.now)
-    lifetime_in_months = models.PositiveIntegerField(default=0, )
-    expiry_date = models.DateField(default=None, blank=True, null=True)
+    lifetime_in_months = models.PositiveIntegerField(default=0, help_text="number_of_months")
+    expiry_date = models.DateField(default=None, blank=True, null=True, editable=False)
     added_at = models.DateTimeField(auto_now_add=True, editable=False)
 
-    def __str__(self):
-        return self.drug_name
-    
     def save(self, *args, **kwargs):
+        # Update Stock If new quantity is added
+        if self.add_quantity:
+            new_stock = int(self.total_stock_quantity) + int(self.add_quantity)
+            self.total_stock_quantity = new_stock
+
+        # Add expiry date and
         if self.manufacture_date and self.lifetime_in_months:
             expiry_date = self.manufacture_date + timedelta(days=30 * self.lifetime_in_months)
             self.expiry_date = expiry_date
-            
+
+        # Generate ID
         if not self.drug_id:
             while True:
-                new_drug_id = str(uuid.uuid4().upper())
+                new_drug_id = str("MED-" + str(uuid.uuid4().hex[:10].upper()))
                 if not PharmacyInventory.objects.filter(drug_id=new_drug_id).exists():
                     self.drug_id = new_drug_id
                     break
         super().save(*args, **kwargs)
-        
+
+    def __str__(self):
+        return self.drug_name
 
 
-# Patient`s Prescription Model
-class Prescription(models.Model):
+# Allot medicines to client on Prescription
+
+class PrescribedMedication(models.Model):
     class DosingFrequency(models.TextChoices):
         ONCE_A_DAY = "ONCE_A_DAY", "Once a day"
         TWICE_A_DAY = "TWICE_A_DAY", "Twice a day"
         THRICE_A_DAY = "THRICE_A_DAY", "Thrice a day"
         FLEXIBLE = "FLEXIBLE", "Flexible timings"
 
-    prescription_id = models.UUIDField(
+    for_prescription = models.ForeignKey('Prescription', on_delete=models.SET_NULL, null=True)
+    medicine = models.ForeignKey(PharmacyInventory, on_delete=models.SET_NULL, null=True)
+    quantity = models.PositiveIntegerField(default=0)
+    dosage_freq = models.CharField(
+        choices=DosingFrequency.choices,
+        default=DosingFrequency.FLEXIBLE,
+        max_length=250,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Related to Prescription: {self.for_prescription.prescription_id}"
+
+
+# Patient`s Prescription Model
+class Prescription(models.Model):
+    prescription_id = models.CharField(
         primary_key=True,
-        default=uuid.uuid4,
+        max_length=50,
         editable=False,
         unique=True,
     )
@@ -423,46 +490,35 @@ class Prescription(models.Model):
         null=True,
         related_name="prescriptions",
     )
-    patient_first_name = models.CharField(max_length=250)
-    patient_last_name = models.CharField(max_length=250)
-    age = models.PositiveIntegerField(default=0)
-    medication = models.ManyToManyField(
-        PharmacyInventory,
+    medications = models.ManyToManyField(
+        "PrescribedMedication",
         related_name="prescriptions",
     )
-    dosage_freq = models.CharField(
-        choices=DosingFrequency.choices,
-        default=DosingFrequency.FLEXIBLE,
-        max_length=250,
-        null=True,
-    )
-    quantity = models.PositiveIntegerField(default=0)
     description = models.TextField(max_length=300, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
-    def __str__(self):
-        return str(self.prescription_id)
-
     def save(self, *args, **kwargs):
+        
+        if not self.medications:
+            medications_dict = self.medications
+            serialized_medications = []
+            for medication in medications_dict:
+                prescribed_med_dict = PrescribedMedication.objects.all(id=medication)
+                serialized_medications.append(prescribed_med_dict)
+                self.medications = serialized_medications
+                
         if not self.prescription_id:
             while True:
-                new_prescription_id = uuid.uuid4()
-                if not Prescription.objects.filter(prescription_id=new_prescription_id).exists():
+                new_prescription_id = str("P-" + str(uuid.uuid4().hex[:10].upper()))
+                if not Prescription.objects.filter(
+                    prescription_id=new_prescription_id
+                ).exists():
                     self.prescription_id = new_prescription_id
                     break
         super().save(*args, **kwargs)
 
-
-
-    
-    
-    
-    
-    
-    
-    
-    
-
+    def __str__(self):
+        return str(self.prescription_id)
 
 
 
