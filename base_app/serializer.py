@@ -71,14 +71,15 @@ class ClinicSerializer(serializers.ModelSerializer):
         fields = (
             "clinic_id",
             "clinic_name",
+            "clinic_logo",
             "user",
-            "contact_number",
-            "email",
-            "address",
-            "city",
-            "zipcode",
-            "country",
-            "status",
+            "clinic_contact_number",
+            "clinic_email",
+            "clinic_address",
+            "clinic_city",
+            "clinic_zipcode",
+            "clinic_country",
+            "clinic_status",
             "created_at",
         )
 
@@ -91,13 +92,15 @@ class ClinicStaffSerializer(serializers.ModelSerializer):
         model = ClinicMember
         fields = (
             "staff_id",
+            "staff_first_name",
+            "staff_last_name",
+            "staff_avatar",
             "clinic_name",
-            "first_name",
-            "last_name",
-            "email",
-            "designation",
+            "staff_contact_number",
+            "staff_email",
+            "staff_designation",
             "shift_type",
-            "status",
+            "staff_status",
             "created_at",
         )
 
@@ -106,16 +109,18 @@ class ClinicStaffSerializer(serializers.ModelSerializer):
 class MedicalProceduresTypesSerializer(serializers.ModelSerializer):
     class Meta:
         model = MedicalProceduresTypes
-        fields = ('procedure_choice',)
+        depth = 1
+        fields = ("procedure_choice",)
 
 
 # Appointment model serializer
 class AppointmentSerializer(serializers.ModelSerializer):
     created_at = serializers.ReadOnlyField()
-    procedures = serializers.SerializerMethodField()  
+    procedures = serializers.SerializerMethodField()
+
     class Meta:
         model = PatientAppointment
-        fields = '__all__'
+        fields = "__all__"
 
     def get_procedures(self, obj):
         return [procedure.procedure_choice for procedure in obj.procedures.all()]
@@ -130,21 +135,31 @@ class PharmacyInventorySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-
 # Prescribed medical information with quality
 class PrescribedMedicationSerializer(serializers.ModelSerializer):
     medicine_name = serializers.CharField(source="medicine.drug_name")
     prescription_id = serializers.CharField(source="for_prescription.prescription_id")
+
     class Meta:
         model = PrescribedMedication
         depth = 1
-        fields = ("prescription_id", "medicine_id", "medicine_name", "quantity", "dosage_freq") 
+        fields = (
+            "prescription_id",
+            "medicine_id",
+            "medicine_name",
+            "purpose",
+            "quantity",
+            "amount_per_unit",
+            "total_payable_amount",
+            "dosage_freq",
+        )
 
 
 # Prescription Information
 class PrescriptionSerializer(serializers.ModelSerializer):
     created_at = serializers.ReadOnlyField()
     medications = PrescribedMedicationSerializer(many=True)
+
     class Meta:
         model = Prescription
         fields = (
@@ -153,9 +168,8 @@ class PrescriptionSerializer(serializers.ModelSerializer):
             "consultant",
             "appointment_id",
             "medications",
+            "med_bill_amount",
+            "grand_total",
             "description",
             "created_at",
         )
-
-
-

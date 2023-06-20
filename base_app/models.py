@@ -3,8 +3,6 @@ import uuid
 from django.utils import timezone
 from datetime import time, date, timedelta
 import datetime
-from school import settings
-from PIL import Image
 from django.db import models
 from django.contrib.auth.models import (
     AbstractBaseUser,
@@ -17,8 +15,6 @@ from django.utils.translation import gettext_lazy as _
 from phonenumber_field.modelfields import PhoneNumberField
 from django.core.validators import RegexValidator
 from django_resized import ResizedImageField
-import json
-from django.core.serializers import serialize
 from django.db import models
 
 
@@ -125,27 +121,27 @@ class Clinic(models.Model):
     )
     user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True)
     clinic_name = models.CharField(max_length=100, blank=False, null=False)
-    avatar = ResizedImageField(
+    clinic_logo = ResizedImageField(
         size=[150, 150],
         default="avatar.jpg",
         upload_to="profile_avatars",
         blank=True,
         null=True,
     )
-    contact_number = PhoneNumberField(
+    clinic_contact_number = PhoneNumberField(
         blank=True,
         null=True,
         default=None,
         validators=[RegexValidator(r"^(\+\d{1,3})?,?\s?\d{8,15}")],
     )
-    address = models.CharField(max_length=250, blank=True, null=True)
-    city = models.CharField(max_length=100, blank=True, null=True)
-    zipcode = models.IntegerField(blank=True, null=True)
-    country = models.CharField(
+    clinic_address = models.CharField(max_length=250, blank=True, null=True)
+    clinic_city = models.CharField(max_length=100, blank=True, null=True)
+    clinic_zipcode = models.IntegerField(blank=True, null=True)
+    clinic_country = models.CharField(
         max_length=100, choices=Country.choices, default=None, null=True
     )
-    email = models.EmailField(blank=True, null=True)
-    status = models.CharField(
+    clinic_email = models.EmailField(blank=True, null=True)
+    clinic_status = models.CharField(
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
     last_updated = models.DateTimeField(auto_now=True)
@@ -153,6 +149,9 @@ class Clinic(models.Model):
 
     def __str__(self):
         return self.clinic_name
+    
+    def get_full_address(self):
+        return f"{self.clinic_address}, \n{self.clinic_city}, {self.clinic_country}, \nZipCode: {self.clinic_zipcode}"
 
     def save(self, *args, **kwargs):
         if not self.clinic_id:
@@ -213,36 +212,36 @@ class ClinicMember(models.Model):
         unique=True,
     )
     clinic_name = models.ForeignKey(Clinic, on_delete=models.SET_NULL, null=True)
-    first_name = models.CharField(max_length=100, blank=False, null=False)
-    last_name = models.CharField(max_length=100, blank=False, null=False)
-    avatar = ResizedImageField(
+    staff_first_name = models.CharField(max_length=100, blank=False, null=False)
+    staff_last_name = models.CharField(max_length=100, blank=False, null=False)
+    staff_avatar = ResizedImageField(
         size=[150, 150],
         default="avatar.jpg",
         upload_to="profile_avatars",
         blank=True,
         null=True,
     )
-    designation = models.CharField(
+    staff_designation = models.CharField(
         max_length=100, choices=StaffDesignation.choices, default=None, null=True
     )
     shift_type = models.CharField(
         max_length=100, choices=Shift_type.choices, default=Shift_type.GENERAL_SHIFT
     )
-    email = models.EmailField(blank=True, null=True)
-    contact_number = PhoneNumberField(
+    staff_email = models.EmailField(blank=True, null=True)
+    staff_contact_number = PhoneNumberField(
         default=None,
         null=True,
         blank=True,
         validators=[RegexValidator(r"^(\+\d{1,3})?,?\s?\d{8,15}")],
     )
-    status = models.CharField(
+    staff_status = models.CharField(
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
     last_updated = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+        return f"{self.staff_first_name} {self.staff_last_name}"
 
     def save(self, *args, **kwargs):
         if not self.staff_id:
@@ -252,7 +251,6 @@ class ClinicMember(models.Model):
                     self.staff_id = new_staff_id
                     break
         super().save(*args, **kwargs)
-
 
 
 class MedicalProceduresTypes(models.Model):
@@ -274,7 +272,7 @@ class MedicalProceduresTypes(models.Model):
         ORGAN_DONATION = ("ORGAN_DONATION", "Organ Donation")
         CONSULTATION = ("CONSULTATION", "Consultation")
         OTHER = ("OTHER", "Other")
-        
+    
     procedure_choice = models.CharField(choices=MyChoices.choices, default=MyChoices.OTHER, max_length=154, unique=True)
     
     def __str__(self):
@@ -322,13 +320,13 @@ class PatientAppointment(models.Model):
     )
     patient_first_name = models.CharField(max_length=150)
     patient_last_name = models.CharField(max_length=150, null=False, blank=False)
-    gender = models.CharField(
+    patient_gender = models.CharField(
         max_length=100, choices=Gender.choices, default=None, null=True
     )
     date_of_birth = models.DateField(blank=True, null=True)
     patient_age = models.IntegerField(blank=True, null=True)
-    email = models.EmailField(blank=True, null=True)
-    contact_number = PhoneNumberField(
+    patient_email = models.EmailField(blank=True, null=True)
+    patient_contact_number = PhoneNumberField(
         blank=True,
         null=True,
         validators=[RegexValidator(r"^(\+\d{1,3})?,?\s?\d{8,15}")],
@@ -341,14 +339,11 @@ class PatientAppointment(models.Model):
         default=timezone.now,
     )
     appointment_slot = models.CharField(blank=False, max_length=50)
-    status = models.CharField(
+    appointment_status = models.CharField(
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
     last_updated = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
-
-    def __str__(self):
-        return self.appointment_id
 
     def save(self, *args, **kwargs):
         if self.date_of_birth:
@@ -372,6 +367,9 @@ class PatientAppointment(models.Model):
                     self.appointment_id = new_appointment_id
                     break
         super().save(*args, **kwargs)
+        
+    def __str__(self):
+        return self.appointment_id
 
 
 # Pharmacy Drug Inventory
@@ -402,7 +400,15 @@ class PharmacyInventory(models.Model):
         max_length=50,
         editable=False,
         unique=True,)
+    
     drug_name = models.CharField(max_length=250, unique=True)
+    drug_image = ResizedImageField(
+        size=[150, 150],
+        default="default_image.png",
+        upload_to="Drug_Stock_Images",
+        blank=True,
+        null=True,
+    )
     generic_name = models.CharField(max_length=250)
     brand_name = models.CharField(max_length=250)
     drug_class = models.CharField(choices=GeneralDrugClass.choices, default=GeneralDrugClass.OTHER, max_length=250,)
@@ -440,7 +446,6 @@ class PharmacyInventory(models.Model):
 
 
 # Allot medicines to client on Prescription
-
 class PrescribedMedication(models.Model):
     class DosingFrequency(models.TextChoices):
         ONCE_A_DAY = "ONCE_A_DAY", "Once a day"
@@ -450,7 +455,10 @@ class PrescribedMedication(models.Model):
 
     for_prescription = models.ForeignKey('Prescription', on_delete=models.SET_NULL, null=True)
     medicine = models.ForeignKey(PharmacyInventory, on_delete=models.SET_NULL, null=True)
+    purpose = models.CharField(max_length=250, blank=True, null=True, editable=False)
+    amount_per_unit = models.DecimalField(default=0, max_digits=10, decimal_places=2, editable=False)
     quantity = models.PositiveIntegerField(default=0)
+    total_payable_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2, editable=False)
     dosage_freq = models.CharField(
         choices=DosingFrequency.choices,
         default=DosingFrequency.FLEXIBLE,
@@ -460,6 +468,15 @@ class PrescribedMedication(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     ordering = ["-created_at"]
 
+    def save(self, *args, **kwargs):
+        if self.medicine:
+            self.amount_per_unit = self.medicine.unit_price
+        if self.medicine:
+            self.purpose = self.medicine.drug_class
+        if self.medicine:
+            self.total_payable_amount = self.amount_per_unit * self.quantity
+        super().save(*args, **kwargs)
+    
     def __str__(self):
         return f"Related to Prescription: {self.for_prescription.prescription_id}"
 
@@ -494,6 +511,8 @@ class Prescription(models.Model):
         "PrescribedMedication",
         related_name="prescriptions",
     )
+    med_bill_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2, editable=False)
+    grand_total = models.DecimalField(default=0, max_digits=10, decimal_places=2, editable=False)
     description = models.TextField(max_length=300, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
@@ -506,17 +525,27 @@ class Prescription(models.Model):
                 prescribed_med_dict = PrescribedMedication.objects.all(id=medication)
                 serialized_medications.append(prescribed_med_dict)
                 self.medications = serialized_medications
-                
+        
+        if self.medications.exists():
+            total_amount = 0
+            for medicine in self.medications.all():
+                amount = float(medicine.total_payable_amount)
+                total_amount += amount
+            # Adding appointment charge
+            appointment_charge = 100
+            self.med_bill_amount = total_amount + appointment_charge
+            tax = 0.18 # 18% of bill amount
+            self.grand_total= self.med_bill_amount + (self.med_bill_amount * tax)
+        
         if not self.prescription_id:
             while True:
                 new_prescription_id = str("P-" + str(uuid.uuid4().hex[:10].upper()))
                 if not Prescription.objects.filter(
-                    prescription_id=new_prescription_id
-                ).exists():
+                    prescription_id=new_prescription_id).exists():
                     self.prescription_id = new_prescription_id
                     break
         super().save(*args, **kwargs)
-
+        
     def __str__(self):
         return str(self.prescription_id)
 

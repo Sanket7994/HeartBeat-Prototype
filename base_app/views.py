@@ -12,6 +12,7 @@ from .serializer import (
     ClinicSerializer,
     CustomSerializer,
     ClinicStaffSerializer,
+    MedicalProceduresTypes,
     AppointmentSerializer,
     PharmacyInventorySerializer,
     PrescriptionSerializer,
@@ -25,18 +26,14 @@ from .emails import (
     send_email_notification_to_patient,
     send_email_notification_to_staff,
 )
-
 from .sms import send_sms_notification_patient, send_sms_notification_staff_member
-
-from .filter import filter_queryset
 from .otp_maker import generate_time_based_otp, is_otp_valid
-
 from .serializer import (
     ForgotPasswordSerializer,
     ResetPasswordSerializer,
     VerifyOTPSerializer,
 )
-
+from .paginator import CustomPagination
 
 # External REST libraries and models
 from rest_framework import status
@@ -465,20 +462,20 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
 
 # CRUD OPERATION FOR CLINIC
 class ClinicListView(APIView):
-    permission_classes = [permissions.AllowAny,]
+    permission_classes = [permissions.AllowAny]
 
     # ADD
     def post(self, request, *args, **kwargs):
         data = {
             "clinic_name": request.data.get("clinic_name"),
-            "contact_number": request.data.get("mobile_number"),
-            "address": request.data.get("address"),
-            "city": request.data.get("city"),
-            "zipcode": request.data.get("zipcode"),
-            "country": request.data.get("country"),
-            "avatar": request.data.get("avatar"),
-            "email": request.data.get("email"),
-            "status": request.data.get("status"),
+            "clinic_address": request.data.get("clinic_address"),
+            "clinic_city": request.data.get("clinic_city"),
+            "clinic_zipcode": request.data.get("clinic_zipcode"),
+            "clinic_country": request.data.get("clinic_country"),
+            "clinic_logo": request.data.get("clinic_logo"),
+            "clinic_contact_number": request.data.get("clinic_contact_number"),
+            "clinic_email": request.data.get("clinic_email"),
+            "clinic_status": request.data.get("clinic_status"),
             "user": request.user.id,
         }
 
@@ -492,51 +489,41 @@ class ClinicListView(APIView):
     # VIEW
     def get(self, request, *args, **kwargs):
         try:
-            queryset = Clinic.objects.all().order_by("-created_at").values()
+            queryset = Clinic.objects.all().order_by("-created_at")
 
             # Filter by query parameters
-            clinic_id = self.request.GET.get("clinic_id", None)
-            clinic_name = self.request.GET.get("clinic_name", None)
-            email = self.request.GET.get("email", None)
-            country = self.request.GET.get("country", None)
-            city = self.request.GET.get("city", None)
+            clinic_id = self.request.GET.get("clinic_id")
+            clinic_name = self.request.GET.get("clinic_name")
+            email = self.request.GET.get("clinic_email")
+            country = self.request.GET.get("clinic_country")
+            city = self.request.GET.get("clinic_city")
 
             if clinic_name:
                 queryset = queryset.filter(clinic_name__icontains=clinic_name)
             if email:
-                queryset = queryset.filter(email=email)
+                queryset = queryset.filter(clinic_email=email)
             if clinic_id:
-                queryset = queryset.filter(clinic_id=clinic_id)
+                queryset = queryset.filter(id=clinic_id)
             if country:
-                queryset = queryset.filter(country=country)
+                queryset = queryset.filter(clinic_country=country)
             if city:
-                queryset = queryset.filter(city=city)
+                queryset = queryset.filter(clinic_city=city)
 
-            # Applying pagination
-            set_limit = self.request.GET.get("limit")
-            paginator = Paginator(queryset, set_limit)
-            page_number = self.request.GET.get("page")
-
-            # Use GET instead of data to retrieve the page number
-            page_obj = paginator.get_page(page_number)
-            serializer = ClinicSerializer(page_obj, many=True)
-
-            # result dictionary
+            # Applying Pagination
+            paginator = CustomPagination()
+            paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
+            serializer = ClinicSerializer(paginated_queryset, many=True)
+            # Constructing response payload
             payload = {
                 "Page": {
-                    "totalRecords": queryset.count(),
-                    "current": page_obj.number,
-                    "next": page_obj.has_next(),
-                    "previous": page_obj.has_previous(),
-                    "totalPages": page_obj.paginator.num_pages,
+                    "totalRecords": paginator.get_total_items(queryset),
+                    "current": paginator.get_page(request),
+                    "totalPages": paginator.calculate_total_pages(paginator.get_total_items(queryset), paginator.get_limit(request)),
                 },
                 "Result": serializer.data,
             }
 
-            return Response(
-                payload,
-                status=status.HTTP_200_OK,
-            )
+            return Response(payload, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -566,12 +553,13 @@ class StaffRelationshipManagementView(APIView):
     def post(self, request, *args, **kwargs):
         data = {
             "clinic_name": request.data.get("clinic_name"),
-            "first_name": request.data.get("first_name"),
-            "last_name": request.data.get("last_name"),
-            "designation": request.data.get("designation"),
+            "staff_first_name": request.data.get("staff_first_name"),
+            "staff_last_name": request.data.get("staff_last_name"),
+            "staff_designation": request.data.get("staff_designation"),
             "shift_type": request.data.get("shift_type"),
-            "email": request.data.get("email"),
-            "status": request.data.get("status"),
+            "staff_email": request.data.get("staff_email"),
+            "staff_contact_number": request.data.get("staff_contact_number"),
+            "staff_status": request.data.get("staff_status"),
         }
 
         serializer = ClinicStaffSerializer(data=data)
@@ -589,9 +577,9 @@ class StaffRelationshipManagementView(APIView):
             # Filter by query parameters
             filter_params = {
                 "clinic_name": self.request.GET.get("clinic_name"),
-                "first_name": self.request.GET.get("first_name"),
-                "designation": self.request.GET.get("designation"),
-                "email": self.request.GET.get("email"),
+                "staff_first_name": self.request.GET.get("staff_first_name"),
+                "staff_designation": self.request.GET.get("staff_designation"),
+                "staff_email": self.request.GET.get("staff_email"),
                 "shift_type": self.request.GET.get("shift_type"),
                 "clinic_id": self.request.GET.get("clinic_id"),
                 "staff_id": self.request.GET.get("staff_id"),
@@ -728,9 +716,9 @@ class AppointmentManagement(APIView):
             "relatedRecipient": request.data.get("relatedRecipient"),
             "patient_first_name": request.data.get("patient_first_name"),
             "patient_last_name": request.data.get("patient_last_name"),
-            "gender": request.data.get("gender"),
-            "contact_number": request.data.get("contact_number"),
-            "email": request.data.get("email"),
+            "patient_gender": request.data.get("patient_gender"),
+            "patient_contact_number": request.data.get("patient_contact_number"),
+            "patient_email": request.data.get("patient_email"),
             "recurring_patient": request.data.get("recurring_patient"),
             "appointment_date": request.data.get("appointment_date"),
             "appointment_slot": request.data.get("appointment_slot"),
@@ -741,7 +729,7 @@ class AppointmentManagement(APIView):
         # Fetching data
         queryset = ClinicMember.objects.filter(
             staff_id=data.get("relatedRecipient")
-        ).values("first_name", "last_name", "email", "contact_number")[0]
+        ).values("staff_first_name", "staff_last_name", "staff_email", "staff_contact_number")[0]
 
         # Sending Email Notifications
         send_email_notification_to_staff(queryset)
@@ -761,8 +749,10 @@ class AppointmentManagement(APIView):
     # View appointment List
     def get(self, request, *args, **kwargs):
         try:
+            # user = request.user
+            # queryset = PatientAppointment.objects.filter(user=user).order_by("-created_at")
             queryset = PatientAppointment.objects.all().order_by("-created_at")
-
+            
             # filter and Search function for list
             filter_params = {
                 "appointment_id": self.request.GET.get("appointment_id"),
@@ -947,6 +937,8 @@ class PrescriptionManagement(APIView):
             "consultant": request.data.get("consultant"),
             "appointment_id": request.data.get("appointment_id"),
             "medications": request.data.get("medication"),
+            "med_bill_amount": request.data.get("med_bill_amount"),
+            "grand_total": request.data.get("grand_total"),
             "description": request.data.get("description"),
         }
 
@@ -969,6 +961,8 @@ class PrescriptionManagement(APIView):
                 "consultant": self.request.GET.get("consultant"),
                 "appointment_id": self.request.GET.get("appointment_id"),
                 "medications": self.request.GET.get("medication"),
+                "med_bill_amount": self.request.GET.get("med_bill_amount"),
+                "grand_total": self.request.GET.get("grand_total"),
                 "description": self.request.GET.get("description"),
                 "created_at": self.request.GET.get("created_at"),
             }
@@ -1058,21 +1052,23 @@ class PrescriptionInvoiceView(APIView):
             prescription = Prescription.objects.filter(prescription_id=prescription_id).values().first()
             prescribed_meds = PrescribedMedication.objects.filter(for_prescription_id=prescription_id).values()
             appointment = PatientAppointment.objects.filter(appointment_id=prescription['appointment_id_id']).values().first()
+            selected_procedures = MedicalProceduresTypes.objects.filter(patientappointment=appointment['appointment_id']).values()
             staff = ClinicMember.objects.filter(staff_id=str(appointment['relatedRecipient_id'])).values().first()
             clinic = Clinic.objects.filter(clinic_id=str(staff['clinic_name_id'])).values().first()
 
             # Convert prescribed_meds QuerySet to a list of dictionaries
             prescribed_meds_list = list(prescribed_meds)
+            selected_procedures_list = list(selected_procedures)
 
             # Merge all the dictionaries
             prescription_dict = {
                 **prescription,
                 'prescribed_meds': prescribed_meds_list,
                 **appointment,
+                'selected_procedures': selected_procedures_list,
                 **staff,
                 **clinic,
             }
-
             return Response({"masterData": prescription_dict}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
