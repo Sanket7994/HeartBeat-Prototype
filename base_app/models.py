@@ -1,8 +1,12 @@
 # Imports
 import uuid
+import stripe
+import json
+from decimal import Decimal
 from django.utils import timezone
+from django.conf import settings
 from datetime import time, date, timedelta
-import datetime
+from datetime import datetime 
 from django.db import models
 from django.contrib.auth.models import (
     AbstractBaseUser,
@@ -383,17 +387,22 @@ class PharmacyInventory(models.Model):
         OTHER = "OTHER", "Other"
         
     class GeneralDrugClass(models.TextChoices):
-        ANALGESICS = ("ANALGESICS","ANALGESICS: Used for headaches, muscle pain, toothaches, menstrual pain",)
-        ANTIPYRETICS = "ANTIPYRETICS", "ANTIPYRETICS: Used to reduce fever"
-        ANTACIDS = "ANTACIDS", "ANTACIDS: Used for heartburn, indigestion, acid reflux"
-        ANTIHISTAMINES = ("ANTIHISTAMINES", "ANTIHISTAMINES: Used for allergies, itchy skin or eyes, sneezing, runny nose",)
-        COUGH_AND_COLD = ("COUGH_AND_COLD", "COUGH_AND_COLD: Used for cough relief, nasal congestion, sore throat",)
-        TOPICAL_ANALGESICS = ("TOPICAL_ANALGESICS", "TOPICAL_ANALGESICS: Used for muscle aches and strains, joint pain, minor injuries",)
-        ANTIDIARRHEALS = "ANTIDIARRHEALS", "ANTIDIARRHEALS: Used for diarrhea relief"
-        DERMATOLOGICAL = ("DERMATOLOGICAL", "DERMATOLOGICAL: Used for acne treatment, eczema or dermatitis management, fungal infections",)
-        ORAL_CONTRACEPTIVES = ("ORAL_CONTRACEPTIVES", "ORAL_CONTRACEPTIVES: Used for pregnancy prevention",)
-        OPHTHALMIC = ("OPHTHALMIC","OPHTHALMIC: Used for eye infections, dry eyes, allergic conjunctivitis",)
-        OTHER = ("OTHER", "Other")
+        ANALGESICS = ("ANALGESICS: Used for headaches, muscle pain, toothaches, menstrual pain", "ANALGESICS")
+        ANTIPYRETICS = ("ANTIPYRETICS: Used to reduce fever", "ANTIPYRETICS")
+        ANTACIDS = ("ANTACIDS: Used for heartburn, indigestion, acid reflux", "ANTACIDS")
+        ANTIHISTAMINES = ("ANTIHISTAMINES: Used for allergies, itchy skin or eyes, sneezing, runny nose", "ANTIHISTAMINES")
+        COUGH_AND_COLD = ("COUGH AND COLD: Used for cough relief, nasal congestion, sore throat", "COUGH_AND_COLD")
+        TOPICAL_ANALGESICS = ("TOPICAL ANALGESICS: Used for muscle aches and strains, joint pain, minor injuries", "TOPICAL_ANALGESICS")
+        ANTIDIARRHEALS = ("ANTIDIARRHEALS: Used for diarrhea relief", "ANTIDIARRHEALS")
+        DERMATOLOGICAL = ("DERMATOLOGICAL: Used for acne treatment, eczema or dermatitis management, fungal infections", "DERMATOLOGICAL")
+        ORAL_CONTRACEPTIVES = ("ORAL CONTRACEPTIVES: Used for pregnancy prevention", "ORAL_CONTRACEPTIVES")
+        OPHTHALMIC = ("OPHTHALMIC: Used for eye infections, dry eyes, allergic conjunctivitis", "OPHTHALMIC")
+        OTHER = ("Other", "OTHER")
+        
+    class UnitType(models.TextChoices):
+        SINGLE_UNIT = "SINGLE_UNIT", "Single Unit"
+        PACK_OF_10 = "PACK_OF_10", "Pack of 10"
+        PACK_OF_50 = "PACK_OF_50", "Pack of 50"
 
     drug_id = models.CharField(
         primary_key=True,
@@ -401,6 +410,7 @@ class PharmacyInventory(models.Model):
         editable=False,
         unique=True,)
     
+    stripe_product_id = models.CharField(max_length=255, blank=True, null=True, editable=False)
     drug_name = models.CharField(max_length=250, unique=True)
     drug_image = ResizedImageField(
         size=[150, 150],
@@ -413,9 +423,12 @@ class PharmacyInventory(models.Model):
     brand_name = models.CharField(max_length=250)
     drug_class = models.CharField(choices=GeneralDrugClass.choices, default=GeneralDrugClass.OTHER, max_length=250,)
     dosage_form = models.CharField(choices=DosageType.choices, default=DosageType.OTHER, max_length=250,)
-    unit_price = models.DecimalField(default=0, max_digits=10, decimal_places=2)
-    add_quantity = models.PositiveIntegerField(default=0, help_text="add_quantity")
-    total_stock_quantity = models.PositiveIntegerField(default=0, editable=False, help_text="main_stock_quantity")
+    unit_type = models.CharField(choices=UnitType.choices, default=UnitType.SINGLE_UNIT, max_length=250,)
+    price = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    stripe_price_id = models.CharField(max_length=255, blank=True, null=True, editable=False)
+    add_new_stock = models.PositiveIntegerField(default=0, help_text="add_quantity")
+    stock_available = models.PositiveIntegerField(default=0, editable=False, help_text="available_stock")
+    stock_history = models.TextField(default="[]", editable=False, help_text="stock history")
     manufacture_date = models.DateField(default=timezone.now)
     lifetime_in_months = models.PositiveIntegerField(default=0, help_text="number_of_months")
     expiry_date = models.DateField(default=None, blank=True, null=True, editable=False)
@@ -423,9 +436,16 @@ class PharmacyInventory(models.Model):
 
     def save(self, *args, **kwargs):
         # Update Stock If new quantity is added
-        if self.add_quantity:
-            new_stock = int(self.total_stock_quantity) + int(self.add_quantity)
-            self.total_stock_quantity = new_stock
+        if self.add_new_stock:
+            new_stock = int(self.stock_available) + int(self.add_new_stock)
+            self.stock_available = new_stock
+            # Store the new entry in stock_history
+            stock_history = json.loads(self.stock_history)
+            new_entry = {'quantity': self.add_new_stock, 'date': f"{datetime.now():%d-%m-%Y %H:%M:%S}"}
+            stock_history.append(new_entry)
+            self.stock_history = json.dumps(stock_history)
+            # Reset add_new_stock to default value
+            self.add_new_stock = 0  
 
         # Add expiry date and
         if self.manufacture_date and self.lifetime_in_months:
@@ -439,6 +459,22 @@ class PharmacyInventory(models.Model):
                 if not PharmacyInventory.objects.filter(drug_id=new_drug_id).exists():
                     self.drug_id = new_drug_id
                     break
+
+        # Create Stripe product and price if IDs are not set
+        if not self.stripe_product_id:
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            product = stripe.Product.create(name=self.drug_name)
+            self.stripe_product_id = product.id
+
+        if not self.stripe_price_id:
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            price = stripe.Price.create(
+                product=self.stripe_product_id,
+                unit_amount=int(self.price * 100),  # Stripe expects the amount in cents
+                currency='usd'  # Change to your desired currency
+            )
+            self.stripe_price_id = price.id
+
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -470,7 +506,7 @@ class PrescribedMedication(models.Model):
 
     def save(self, *args, **kwargs):
         if self.medicine:
-            self.amount_per_unit = self.medicine.unit_price
+            self.amount_per_unit = self.medicine.price
         if self.medicine:
             self.purpose = self.medicine.drug_class
         if self.medicine:
@@ -483,6 +519,11 @@ class PrescribedMedication(models.Model):
 
 # Patient`s Prescription Model
 class Prescription(models.Model):
+    class StatusCode(models.TextChoices):
+        APPROVED = ("APPROVED", "Approved")
+        PENDING = ("PENDING", "Pending")
+        CANCELLED = ("CANCELLED", "Cancelled")
+        
     prescription_id = models.CharField(
         primary_key=True,
         max_length=50,
@@ -511,43 +552,71 @@ class Prescription(models.Model):
         "PrescribedMedication",
         related_name="prescriptions",
     )
+    stripe_appointment_service_id = models.CharField(max_length=250, blank=True, null=True)
+    stripe_appointment_price_id = models.CharField(max_length=250, blank=True, null=True)
+    appointment_fee = models.DecimalField(default=0, max_digits=10, decimal_places=2, editable=False)
     med_bill_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2, editable=False)
+    coupon_discount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     grand_total = models.DecimalField(default=0, max_digits=10, decimal_places=2, editable=False)
     description = models.TextField(max_length=300, blank=True, null=True)
+    approval_status = models.CharField(max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
     def save(self, *args, **kwargs):
-        
-        if not self.medications:
-            medications_dict = self.medications
+        if not self.medications.exists():
+            medications_dict = self.medications.values_list("id", flat=True)
             serialized_medications = []
-            for medication in medications_dict:
-                prescribed_med_dict = PrescribedMedication.objects.all(id=medication)
-                serialized_medications.append(prescribed_med_dict)
-                self.medications = serialized_medications
-        
+            for medication_id in medications_dict:
+                prescribed_med = PrescribedMedication.objects.get(id=medication_id)
+                serialized_medications.append(prescribed_med)
+            self.medications.set(serialized_medications)
+
         if self.medications.exists():
-            total_amount = 0
+            total_med_amount = 0
             for medicine in self.medications.all():
-                amount = float(medicine.total_payable_amount)
-                total_amount += amount
+                amount = Decimal(str((medicine.total_payable_amount)))
+                total_med_amount += amount
             # Adding appointment charge
-            appointment_charge = 100
-            self.med_bill_amount = total_amount + appointment_charge
-            tax = 0.18 # 18% of bill amount
-            self.grand_total= self.med_bill_amount + (self.med_bill_amount * tax)
-        
+            self.appointment_fee = 100
+            self.med_bill_amount = total_med_amount
+            self.grand_total = (self.med_bill_amount + self.appointment_fee) - self.coupon_discount
+
         if not self.prescription_id:
             while True:
                 new_prescription_id = str("P-" + str(uuid.uuid4().hex[:10].upper()))
-                if not Prescription.objects.filter(
-                    prescription_id=new_prescription_id).exists():
+                if not Prescription.objects.filter(prescription_id=new_prescription_id).exists():
                     self.prescription_id = new_prescription_id
                     break
-        super().save(*args, **kwargs)
         
+        # Create Stripe product and price if IDs are not set
+        if not self.stripe_appointment_service_id:
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            product = stripe.Product.create(name="Appointment Fee")
+            self.stripe_appointment_service_id = product.id
+
+        if not self.stripe_appointment_price_id:
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            price = stripe.Price.create(
+                product = self.stripe_appointment_service_id,
+                unit_amount = int(self.appointment_fee * 100),  # Stripe expects the amount in cents
+                currency = 'usd'  
+            )
+            self.stripe_appointment_price_id = price.id
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return str(self.prescription_id)
-
-
-
+    
+    
+    
+# class ClientPaymentStatus(models.Model):
+#     prescription_id = models.ForeignKey(Prescription, on_delete=models.SET_NULL, null=True, related_name="prescription_receipt_id",)
+#     stripe_session_id = models.CharField(max_length=250, editable=False)
+#     stripe_payment_intent = models.CharField(max_length=250, editable=False)
+#     stripe_payment_method_types = models.CharField(max_length=250, editable=False)
+#     stripe_payment_status = models.CharField(max_length=250, editable=False)
+    
+#     def save(self, *args, **kwargs):
+#         if not self.stripe_session_id:
+            
+    

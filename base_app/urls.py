@@ -4,7 +4,8 @@ from .views import MyTokenObtainPairView, LogoutView
 from .views import ClinicListView, StaffRelationshipManagementView
 from .views import AppointmentManagement, PharmacyInventoryManagement, PrescriptionManagement
 from .views import PingView, LoginView, SignupView, ForgotPasswordView, ResetPasswordView, UserRetrieveUpdateAPIView, VerifyOTPView
-from .views import ResendOTP, PrescribedMedicationHistory, PrescriptionInvoiceView
+from .views import ResendOTP, PrescribedMedicationHistory, PrescriptionPaymentLinkSetup
+from .views import FetchPrescriptReceipt, CreateCheckoutSessionView
 
 
 
@@ -41,11 +42,14 @@ urlpatterns = [
     
     path('clinic/scheduler/appointments/prescription/create/', PharmacyInventoryManagement.as_view(), name='new-drug'),
     path('clinic/scheduler/appointments/prescription/view/', PrescriptionManagement.as_view(), name='create-prescription'),
-    path('prescription/download/<str:prescription_id>/', PrescriptionInvoiceView.as_view(), name='download-prescription'),
+    path('pharmacy/prescribed-med/<str:prescription_id>/', PrescribedMedicationHistory.as_view(), name='med-history'),
+    path('prescription/fetch/<str:prescription_id>/', FetchPrescriptReceipt.as_view(), name='upload-prescription'),
     
+    path('prescription/payment/<str:prescription_id>/', PrescriptionPaymentLinkSetup.as_view(), name='payment-prescription'),
+    path('payment/<str:prescription_id>/create-checkout-session/', CreateCheckoutSessionView.as_view(), name='create-checkout-session'),
+
     path('pharmacy/inventory/add/', PharmacyInventoryManagement.as_view(), name='new-drug'),
     path('pharmacy/inventory/list/', PharmacyInventoryManagement.as_view(), name='view-drug-list'),
-    path('pharmacy/prescribed-med/<str:prescription_id>/', PrescribedMedicationHistory.as_view(), name='med-history'),
     
     path('api/token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

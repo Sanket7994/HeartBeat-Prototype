@@ -25,9 +25,11 @@ from .emails import (
     send_user_profile_delete_notification,
     send_email_notification_to_patient,
     send_email_notification_to_staff,
+    send_pay_link_via_email,
 )
 from .sms import send_sms_notification_patient, send_sms_notification_staff_member
 from .otp_maker import generate_time_based_otp, is_otp_valid
+from .prescription_fetch import fetch_prescription_data, create_payment_link
 from .serializer import (
     ForgotPasswordSerializer,
     ResetPasswordSerializer,
@@ -51,9 +53,17 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 
 # External Django libraries and modules
+
+import stripe
+import requests, pdfkit
 from datetime import date
 from datetime import timedelta
 from django.dispatch import Signal
+from django.db.models import F
+from django.views import View
+from django.conf import settings
+from django.http import JsonResponse
+from django.http import HttpResponse
 from django.core.paginator import Paginator, EmptyPage
 from django.shortcuts import get_object_or_404
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -63,6 +73,7 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.tokens import default_token_generator
 
 
+#####################################################################################################################
 class PingView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -460,6 +471,7 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
 
 ############################################################################################################################
 
+
 # CRUD OPERATION FOR CLINIC
 class ClinicListView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -511,14 +523,19 @@ class ClinicListView(APIView):
 
             # Applying Pagination
             paginator = CustomPagination()
-            paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
+            paginated_queryset = paginator.paginate_queryset(
+                queryset, request, view=self
+            )
             serializer = ClinicSerializer(paginated_queryset, many=True)
             # Constructing response payload
             payload = {
                 "Page": {
                     "totalRecords": paginator.get_total_items(queryset),
                     "current": paginator.get_page(request),
-                    "totalPages": paginator.calculate_total_pages(paginator.get_total_items(queryset), paginator.get_limit(request)),
+                    "totalPages": paginator.calculate_total_pages(
+                        paginator.get_total_items(queryset),
+                        paginator.get_limit(request),
+                    ),
                 },
                 "Result": serializer.data,
             }
@@ -729,7 +746,11 @@ class AppointmentManagement(APIView):
         # Fetching data
         queryset = ClinicMember.objects.filter(
             staff_id=data.get("relatedRecipient")
-        ).values("staff_first_name", "staff_last_name", "staff_email", "staff_contact_number")[0]
+        ).values(
+            "staff_first_name", "staff_last_name", "staff_email", "staff_contact_number"
+        )[
+            0
+        ]
 
         # Sending Email Notifications
         send_email_notification_to_staff(queryset)
@@ -752,7 +773,7 @@ class AppointmentManagement(APIView):
             # user = request.user
             # queryset = PatientAppointment.objects.filter(user=user).order_by("-created_at")
             queryset = PatientAppointment.objects.all().order_by("-created_at")
-            
+
             # filter and Search function for list
             filter_params = {
                 "appointment_id": self.request.GET.get("appointment_id"),
@@ -926,6 +947,7 @@ class PharmacyInventoryManagement(APIView):
 
 ############################################################################################################################
 
+
 # Prescription Creation View
 class PrescriptionManagement(APIView):
     permission_classes = [permissions.AllowAny]
@@ -938,6 +960,7 @@ class PrescriptionManagement(APIView):
             "appointment_id": request.data.get("appointment_id"),
             "medications": request.data.get("medication"),
             "med_bill_amount": request.data.get("med_bill_amount"),
+            "coupon_discount": request.data.get("coupon_discount"),
             "grand_total": request.data.get("grand_total"),
             "description": request.data.get("description"),
         }
@@ -962,6 +985,7 @@ class PrescriptionManagement(APIView):
                 "appointment_id": self.request.GET.get("appointment_id"),
                 "medications": self.request.GET.get("medication"),
                 "med_bill_amount": self.request.GET.get("med_bill_amount"),
+                "coupon_discount": self.request.GET.get("coupon_discount"),
                 "grand_total": self.request.GET.get("grand_total"),
                 "description": self.request.GET.get("description"),
                 "created_at": self.request.GET.get("created_at"),
@@ -1008,10 +1032,12 @@ class PrescriptionManagement(APIView):
 # View alloted medication in all prescriptions
 class PrescribedMedicationHistory(APIView):
     permission_classes = [permissions.AllowAny]
-    
+
     def get(self, request, prescription_id, *args, **kwargs):
         try:
-            queryset = PrescribedMedication.objects.filter(for_prescription_id=prescription_id)
+            queryset = PrescribedMedication.objects.filter(
+                for_prescription_id=prescription_id
+            )
 
             # Applying pagination
             set_limit = self.request.GET.get("limit")
@@ -1038,42 +1064,107 @@ class PrescribedMedicationHistory(APIView):
             )
         except Exception as e:
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+
 ############################################################################################################################
 
-# To dynamically update prescription receipt data to frontend
 
-class PrescriptionInvoiceView(APIView):
+# View for Prescription Payment setup
+
+
+class PrescriptionPaymentLinkSetup(APIView):
     permission_classes = [permissions.AllowAny]
 
-    # Fetch data for prescription
     def get(self, request, prescription_id, *args, **kwargs):
         try:
-            prescription = Prescription.objects.filter(prescription_id=prescription_id).values().first()
-            prescribed_meds = PrescribedMedication.objects.filter(for_prescription_id=prescription_id).values()
-            appointment = PatientAppointment.objects.filter(appointment_id=prescription['appointment_id_id']).values().first()
-            selected_procedures = MedicalProceduresTypes.objects.filter(patientappointment=appointment['appointment_id']).values()
-            staff = ClinicMember.objects.filter(staff_id=str(appointment['relatedRecipient_id'])).values().first()
-            clinic = Clinic.objects.filter(clinic_id=str(staff['clinic_name_id'])).values().first()
+            # Fetching the data related to unique prescription_id
+            prescription_dict = fetch_prescription_data(prescription_id)
 
-            # Convert prescribed_meds QuerySet to a list of dictionaries
-            prescribed_meds_list = list(prescribed_meds)
-            selected_procedures_list = list(selected_procedures)
+            # Generating the payment link from stripe
+            payment_url = create_payment_link(prescription_dict)
 
-            # Merge all the dictionaries
-            prescription_dict = {
-                **prescription,
-                'prescribed_meds': prescribed_meds_list,
-                **appointment,
-                'selected_procedures': selected_procedures_list,
-                **staff,
-                **clinic,
-            }
-            return Response({"masterData": prescription_dict}, status=status.HTTP_200_OK)
+            if payment_url is None:
+                # Handle the error condition, such as returning an error response
+                return Response(
+                    data={"error": "Failed to create payment link"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Sending the payment link to client via email
+            send_pay_link_via_email(prescription_dict, payment_url)
+
+            return Response(
+                data={"message": "Email with payment link sent successfully!"},
+                status=status.HTTP_200_OK,
+            )
+
         except Exception as e:
-            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                data={"Internal error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
 
 
+# View request to retrieve and share prescription related data
+# to frontend to generate Prescription Report
 
-############################################################################################################################
 
+class FetchPrescriptReceipt(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, prescription_id, *args, **kwargs):
+        try:
+            prescription_dict = fetch_prescription_data(prescription_id)
+            return Response(
+                data={"masterData": prescription_dict}, status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            return HttpResponse(f"Error occurred: {str(e)}", status=500)
+
+
+# Stripe Payment API
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
+domain_url = settings.YOUR_DOMAIN
+
+
+class CreateCheckoutSessionView(View):
+    def post(self, request, prescription_id, *args, **kwargs):
+        try:
+            data_dict = fetch_prescription_data()
+            items = create_payment_link(data_dict)
+
+            checkout_session = stripe.checkout.Session.create(
+                success_url=domain_url + "success?session_id={CHECKOUT_SESSION_ID}",
+                cancel_url=domain_url + "/cancel/",
+                payment_method_types=["card"],
+                mode="payment",
+                line_items=items,
+            )
+            return JsonResponse({"sessionId": checkout_session["id"]}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def test(prescription_id):
+    try:
+        data_dict = fetch_prescription_data(prescription_id)
+        items = create_payment_link(data_dict)
+
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            success_url=domain_url + "/success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=domain_url + "/cancel/",
+            line_items=items,
+        )
+        
+        verifyPayment = stripe.checkout.Session.retrieve(checkout_session.id)
+        if verifyPayment.payment_status == 'paid':
+            # make the invoice payment paid in the django models
+            pass
+        print(checkout_session.url)
+    except Exception as e:
+        print(e)
+    
+test()

@@ -168,8 +168,13 @@ class PrescriptionSerializer(serializers.ModelSerializer):
             "consultant",
             "appointment_id",
             "medications",
+            "stripe_appointment_service_id",
+            "stripe_appointment_price_id",
+            "appointment_fee",
             "med_bill_amount",
+            "coupon_discount",
             "grand_total",
             "description",
+            "approval_status",
             "created_at",
         )

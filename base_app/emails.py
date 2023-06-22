@@ -8,7 +8,6 @@ from django.core.mail import send_mail
 
 # Email notification after signup
 def send_email_notification(recipient_list, fetched_activation_OTP):
-    
     email_from = settings.DEFAULT_FROM_EMAIL
     subject = "Account Update Notification"
     html_body = f"""
@@ -36,16 +35,6 @@ def send_email_notification(recipient_list, fetched_activation_OTP):
     send_mail(subject, html_body, email_from, recipient_list)
 
     return True
-
-
-
-
-
-
-
-
-
-
 
 
 # Email notification If user changes Profile information
@@ -147,5 +136,25 @@ Kind regards,
 TestProject Support Team
 """
     send_mail(subject, message, email_from, [patient_email])
+
+    return True
+
+
+# Send email with Prescription and Payment link
+def send_pay_link_via_email(client, pay_link):
+    client_email = client.get("patient_email")
+    email_from = settings.DEFAULT_FROM_EMAIL
+    subject = "Appointment update Notification"
+    message = f"""
+Hi {client.get('patient_first_name')}, 
+
+following is the payment link click on it for Payment: {pay_link}
+
+Our Team will be waiting for your arrival. Thanks for choosing us.
+
+Kind regards,
+TestProject Support Team
+"""
+    send_mail(subject, message, email_from, [client_email])
 
     return True

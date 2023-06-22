@@ -5,7 +5,7 @@ Django settings for school project.
 
 from pathlib import Path
 from datetime import timedelta
-
+import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -126,7 +126,7 @@ SIMPLE_JWT = {
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [os.path.join(BASE_DIR, 'templates')],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -205,3 +205,11 @@ EMAIL_HOST_USER = "vidlystore@gmail.com"
 DEFAULT_FROM_EMAIL = "vidlystore@gmail.com"
 EMAIL_HOST_PASSWORD = "fmiqguuvufqsugvx"
 EMAIL_PORT = 587
+
+# Stripe 
+YOUR_DOMAIN = 'http://127.0.0.1:8000'
+STRIPE_PUBLIC_KEY = "pk_test_51NKxAZSFXVKGwTOE3k746d8zjMGt96O4knpOzN4JYh4U8cqAuSEZWLFEGHdCdIAWifpdaW9O3qpvRwtu7KFFP9Pa003CdiLm9V"
+STRIPE_SECRET_KEY = "sk_test_51NKxAZSFXVKGwTOE3rbvA7SELiFfxathCQTnJ61bRcQGmvyOxHgCOzTKHhwrvJQpyTV1KWkH2yVbMvpVP5ywM6bb000PUpwvWd"
+STRIPE_WEBHOOK_SECRET = "whsec_1146861ee145904c9eefb1365b7bedfb619e203275fb6e2113b9ef2573d95b70"
+
+WKHTMLTOPDF_CMD= '/usr/bin/wkhtmltopdf'
