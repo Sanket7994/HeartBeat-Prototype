@@ -8,7 +8,8 @@ from .models import (
     PatientAppointment,
     Prescription,
     PharmacyInventory,
-    PrescribedMedication,
+    PrescribedMedicationModel,
+    ClientPaymentData,
 )
 
 # To convert the Model object to an API-appropriate format like JSON,
@@ -40,7 +41,7 @@ class VerifyOTPSerializer(serializers.Serializer):
     def validate_otp(self, otp):
         if (
             not all(c in string.ascii_letters + string.digits for c in otp)
-            or len(otp) != 8
+            or len(otp) != 6
         ):
             raise serializers.ValidationError("Invalid OTP format.")
         return otp
@@ -136,15 +137,15 @@ class PharmacyInventorySerializer(serializers.ModelSerializer):
 
 
 # Prescribed medical information with quality
-class PrescribedMedicationSerializer(serializers.ModelSerializer):
+class PrescribedMedicationModelSerializer(serializers.ModelSerializer):
     medicine_name = serializers.CharField(source="medicine.drug_name")
     prescription_id = serializers.CharField(source="for_prescription.prescription_id")
 
     class Meta:
-        model = PrescribedMedication
+        model = PrescribedMedicationModel
         depth = 1
         fields = (
-            "prescription_id",
+            "for_prescription_id",
             "medicine_id",
             "medicine_name",
             "purpose",
@@ -158,7 +159,7 @@ class PrescribedMedicationSerializer(serializers.ModelSerializer):
 # Prescription Information
 class PrescriptionSerializer(serializers.ModelSerializer):
     created_at = serializers.ReadOnlyField()
-    medications = PrescribedMedicationSerializer(many=True)
+    medications = PrescribedMedicationModelSerializer(many=True)
 
     class Meta:
         model = Prescription
@@ -176,5 +177,20 @@ class PrescriptionSerializer(serializers.ModelSerializer):
             "grand_total",
             "description",
             "approval_status",
+            "payment_status",
             "created_at",
         )
+
+
+# Payment serialization
+class ClientPaymentDataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClientPaymentData
+        fields = ['prescription_id', 'session_id', 'payment_intent', 'payment_method',
+                  'client_billing_address', 'stripe_session_status', 'stripe_payment_status',
+                  'session_created_on', 'session_expired_on']
+        
+    def update(self, instance, validated_data):
+        if self.context['request'].method == 'PUT':
+            raise serializers.ValidationError("Updating existing instances is not allowed.")
+        return super().update(instance, validated_data)

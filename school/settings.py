@@ -36,8 +36,8 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_countries",
-    "base_app",
-]
+    "base_app",]
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -213,3 +213,10 @@ STRIPE_SECRET_KEY = "sk_test_51NKxAZSFXVKGwTOE3rbvA7SELiFfxathCQTnJ61bRcQGmvyOxH
 STRIPE_WEBHOOK_SECRET = "whsec_1146861ee145904c9eefb1365b7bedfb619e203275fb6e2113b9ef2573d95b70"
 
 WKHTMLTOPDF_CMD= '/usr/bin/wkhtmltopdf'
+
+
+
+GRAPH_MODELS = {
+  'all_applications': True,
+  'group_models': True,
+}

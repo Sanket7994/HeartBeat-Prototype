@@ -1,6 +1,8 @@
 from school import settings
-from rest_framework.response import Response
 from django.core.mail import send_mail
+from django.conf import settings
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 
 
 #### Email seeding functions #####
@@ -105,7 +107,7 @@ def send_email_notification_to_staff(staff_member):
     email_from = settings.DEFAULT_FROM_EMAIL
     subject = "Appointment update Notification"
     message = f"""
-Hi {staff_member.get('first_name')}, 
+Hi {staff_member.get('staff_first_name')}, 
 
 An appointment has been successfully setup with the client. 
 please check the dashboard for more information.
@@ -120,8 +122,8 @@ TestProject Support Team
 
 # Email notification after signup
 def send_email_notification_to_patient(patient, staff_member):
-    relatedRecipient_firstName = staff_member.get("first_name")
-    relatedRecipient_lastName = staff_member.get("last_name")
+    relatedRecipient_firstName = staff_member.get("staff_first_name")
+    relatedRecipient_lastName = staff_member.get("staff_last_name")
     patient_email = patient.get("email")
     email_from = settings.DEFAULT_FROM_EMAIL
     subject = "Appointment update Notification"
@@ -140,21 +142,56 @@ TestProject Support Team
     return True
 
 
-# Send email with Prescription and Payment link
+# Send payment link to client email address 
 def send_pay_link_via_email(client, pay_link):
     client_email = client.get("patient_email")
     email_from = settings.DEFAULT_FROM_EMAIL
-    subject = "Appointment update Notification"
-    message = f"""
-Hi {client.get('patient_first_name')}, 
-
-following is the payment link click on it for Payment: {pay_link}
-
-Our Team will be waiting for your arrival. Thanks for choosing us.
-
-Kind regards,
-TestProject Support Team
-"""
-    send_mail(subject, message, email_from, [client_email])
-
+    subject = "Pending Payment Notification Email"
+    
+    # Render the HTML template with the button
+    html_message = render_to_string(
+        "../templates/pay_link_email.html",
+        {"client": client, "pay_link": pay_link}
+    )
+    
+    # Extract the plain text content from the HTML
+    plain_message = strip_tags(html_message)
+    
+    send_mail(
+        subject=subject,
+        message=plain_message,
+        from_email=email_from,
+        recipient_list=[client_email],
+        html_message=html_message
+    )
+    
     return True
+
+
+# Send payment link to client email address 
+def send_successful_purchase_email(client, pay_link):
+    client_email = client.get("patient_email")
+    email_from = settings.DEFAULT_FROM_EMAIL
+    subject = "Pending Payment Notification Email"
+    
+    # Render the HTML template with the button
+    html_message = render_to_string(
+        "../templates/pay_link_email.html",
+        {"client": client, "pay_link": pay_link}
+    )
+    
+    # Extract the plain text content from the HTML
+    plain_message = strip_tags(html_message)
+    
+    send_mail(
+        subject=subject,
+        message=plain_message,
+        from_email=email_from,
+        recipient_list=[client_email],
+        html_message=html_message
+    )
+    
+    return True
+
+
+

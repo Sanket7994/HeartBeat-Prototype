@@ -1,11 +1,13 @@
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
+from . import views
 from .views import MyTokenObtainPairView, LogoutView
 from .views import ClinicListView, StaffRelationshipManagementView
 from .views import AppointmentManagement, PharmacyInventoryManagement, PrescriptionManagement
 from .views import PingView, LoginView, SignupView, ForgotPasswordView, ResetPasswordView, UserRetrieveUpdateAPIView, VerifyOTPView
-from .views import ResendOTP, PrescribedMedicationHistory, PrescriptionPaymentLinkSetup
-from .views import FetchPrescriptReceipt, CreateCheckoutSessionView
+from .views import ResendOTP, PrescribedMedicationModelHistory
+from .views import FetchPrescriptReceipt, PrescriptionPaymentCheckoutSessionView, CancelPaymentView, SuccessPaymentView
+
 
 
 
@@ -15,8 +17,8 @@ urlpatterns = [
     
     path('login/', LoginView.as_view(), name='login'),
     path('signup/', SignupView.as_view(), name='signup'),
-    path('signup/verify/', VerifyOTPView.as_view(), name='auth_verify'),
-    path('signup/verify/resend/', ResendOTP.as_view(), name='resend-otp'),
+    path('signup/verify', VerifyOTPView.as_view(), name='auth_verify'),
+    path('signup/verify/resend', ResendOTP.as_view(), name='resend-otp'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('clinic/login/', LoginView.as_view(), name='login-clinic'),
     
@@ -37,17 +39,21 @@ urlpatterns = [
     path('clinic/scheduler/appointments/availability/', AppointmentManagement.as_view(), name='check-availability'),
     path('clinic/scheduler/appointments/create/', AppointmentManagement.as_view(), name='new-appointment'),
     path('clinic/scheduler/appointments/view/', AppointmentManagement.as_view(), name='view-appointment'),
+    path('clinic/scheduler/appointments/view/<str:appointment_id>/', AppointmentManagement.as_view(), name='view-specific-appointment'),
     path('clinic/scheduler/appointments/update/<str:appointment_id>/', AppointmentManagement.as_view(), name='update-appointment'),
     path('clinic/scheduler/appointments/delete/<str:appointment_id>/', AppointmentManagement.as_view(), name='delete-appointment'),
     
     path('clinic/scheduler/appointments/prescription/create/', PharmacyInventoryManagement.as_view(), name='new-drug'),
     path('clinic/scheduler/appointments/prescription/view/', PrescriptionManagement.as_view(), name='create-prescription'),
-    path('pharmacy/prescribed-med/<str:prescription_id>/', PrescribedMedicationHistory.as_view(), name='med-history'),
-    path('prescription/fetch/<str:prescription_id>/', FetchPrescriptReceipt.as_view(), name='upload-prescription'),
+    path('pharmacy/prescribed-med/<str:prescription_id>/', PrescribedMedicationModelHistory.as_view(), name='med-history'),
+    path('prescription/fetch/appointment_id=<str:appointment_id>&prescription_id=<str:prescription_id>', FetchPrescriptReceipt.as_view(), name='upload-prescription'),
     
-    path('prescription/payment/<str:prescription_id>/', PrescriptionPaymentLinkSetup.as_view(), name='payment-prescription'),
-    path('payment/<str:prescription_id>/create-checkout-session/', CreateCheckoutSessionView.as_view(), name='create-checkout-session'),
-
+    path('config/', views.stripe_config),
+    path('payment/create-checkout-session/<str:prescription_id>/', PrescriptionPaymentCheckoutSessionView.as_view(), name='create-checkout-session'),
+    path('payment/success', SuccessPaymentView.as_view(), name='success-payment-view'),
+    path('payment/cancel', CancelPaymentView.as_view(), name='cancel-payment-view'),    
+    
+    
     path('pharmacy/inventory/add/', PharmacyInventoryManagement.as_view(), name='new-drug'),
     path('pharmacy/inventory/list/', PharmacyInventoryManagement.as_view(), name='view-drug-list'),
     
@@ -55,3 +61,7 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/logout_token/', LogoutView.as_view(), name='logout_token'), 
 ]
+
+
+
+

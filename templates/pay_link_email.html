@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Notification Email for Pending Payment</title>
+</head>
+<body>
+    <p>Hi {{ client.patient_first_name }},</p>
+
+    <p>Hope you are doing well. This is just a friendly reminder that payment for your unpaid <strong>Prescription Reference ID # {{ client.prescription_id }}</strong> is due since <strong>{{ client.created_at }}</strong>.</p>
+
+    <p>Please feel free to contact me if you have any questions about the invoice, or if you'd like to arrange your payment.</p>
+
+    <p>Following is the payment button:</p>
+    <a href="{{ pay_link }}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Make Payment</a>
+
+    <p>Our Team will be waiting for your arrival. Thanks for choosing us.</p>
+
+    <p>Kind regards,<br>
+    TestProject Support Team</p>
+</body>
+</html>

@@ -13,11 +13,15 @@ from django.contrib.auth.models import (
     BaseUserManager,
     PermissionsMixin,
 )
+import requests
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from phonenumber_field.modelfields import PhoneNumberField
 from django.core.validators import RegexValidator
+from django.contrib.sessions.models import Session
 from django_resized import ResizedImageField
 from django.db import models
 
@@ -338,6 +342,7 @@ class PatientAppointment(models.Model):
     )
     recurring_patient = models.BooleanField(default=False)
     procedures = models.ManyToManyField(MedicalProceduresTypes)
+    appointment_description = models.TextField(blank=True, null=True)
     appointment_date = models.DateField(
         validators=[validate_date, validate_weekday],
         default=timezone.now,
@@ -376,6 +381,38 @@ class PatientAppointment(models.Model):
         return self.appointment_id
 
 
+
+# AutoUpdating Patient Information
+class ClientDataCollectionPool(models.Model):
+    client_id = models.CharField(
+        primary_key=True,
+        max_length=50,
+        editable=False,
+        unique=True,
+    )
+    client_first_name = models.CharField(max_length=250, blank=True, null=True)
+    client_last_name = models.CharField(max_length=250, blank=True, null=True)
+    client_dob = models.CharField(max_length=250, blank=True, null=True)
+    client_gender = models.CharField(max_length=250, blank=True, null=True)
+    client_contact_number = models.CharField(max_length=250, blank=True, null=True)
+    client_email = models.CharField(max_length=250, blank=True, null=True)
+    client_billing_address = models.CharField(max_length=250, blank=True, null=True)
+    appointment_count = models.IntegerField(default=0)
+    prescription_count = models.IntegerField(default=0)
+    total_billings = models.IntegerField(default=0)
+    
+    def save(self, *args, **kwargs):
+        if not self.client_id:
+            while True:
+                new_client_id = str("CL-" + str(uuid.uuid4().hex[:5].upper()))
+                if not Prescription.objects.filter(client_id=new_client_id).exists():
+                    self.client_id = new_client_id
+                    break
+                
+    def __str__(self):
+        return f"{self.client_first_name} {self.client_last_name}"
+ 
+    
 # Pharmacy Drug Inventory
 class PharmacyInventory(models.Model):
     class DosageType(models.TextChoices):
@@ -482,7 +519,7 @@ class PharmacyInventory(models.Model):
 
 
 # Allot medicines to client on Prescription
-class PrescribedMedication(models.Model):
+class PrescribedMedicationModel(models.Model):
     class DosingFrequency(models.TextChoices):
         ONCE_A_DAY = "ONCE_A_DAY", "Once a day"
         TWICE_A_DAY = "TWICE_A_DAY", "Twice a day"
@@ -517,7 +554,7 @@ class PrescribedMedication(models.Model):
         return f"Related to Prescription: {self.for_prescription.prescription_id}"
 
 
-# Patient`s Prescription Model
+# Prescription Model
 class Prescription(models.Model):
     class StatusCode(models.TextChoices):
         APPROVED = ("APPROVED", "Approved")
@@ -549,7 +586,7 @@ class Prescription(models.Model):
         related_name="prescriptions",
     )
     medications = models.ManyToManyField(
-        "PrescribedMedication",
+        PrescribedMedicationModel,
         related_name="prescriptions",
     )
     stripe_appointment_service_id = models.CharField(max_length=250, blank=True, null=True)
@@ -560,6 +597,7 @@ class Prescription(models.Model):
     grand_total = models.DecimalField(default=0, max_digits=10, decimal_places=2, editable=False)
     description = models.TextField(max_length=300, blank=True, null=True)
     approval_status = models.CharField(max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING)
+    payment_status = models.CharField(max_length=100, default="UNPAID")
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
     def save(self, *args, **kwargs):
@@ -567,7 +605,7 @@ class Prescription(models.Model):
             medications_dict = self.medications.values_list("id", flat=True)
             serialized_medications = []
             for medication_id in medications_dict:
-                prescribed_med = PrescribedMedication.objects.get(id=medication_id)
+                prescribed_med = PrescribedMedicationModel.objects.get(id=medication_id)
                 serialized_medications.append(prescribed_med)
             self.medications.set(serialized_medications)
 
@@ -587,8 +625,7 @@ class Prescription(models.Model):
                 if not Prescription.objects.filter(prescription_id=new_prescription_id).exists():
                     self.prescription_id = new_prescription_id
                     break
-        
-        # Create Stripe product and price if IDs are not set
+                
         if not self.stripe_appointment_service_id:
             stripe.api_key = settings.STRIPE_SECRET_KEY
             product = stripe.Product.create(name="Appointment Fee")
@@ -597,26 +634,39 @@ class Prescription(models.Model):
         if not self.stripe_appointment_price_id:
             stripe.api_key = settings.STRIPE_SECRET_KEY
             price = stripe.Price.create(
-                product = self.stripe_appointment_service_id,
-                unit_amount = int(self.appointment_fee * 100),  # Stripe expects the amount in cents
-                currency = 'usd'  
+                product=self.stripe_appointment_service_id,
+                unit_amount=int(self.appointment_fee * 100),  # Stripe expects the amount in cents
+                currency='usd'
             )
             self.stripe_appointment_price_id = price.id
+
         super().save(*args, **kwargs)
 
     def __str__(self):
         return str(self.prescription_id)
-    
-    
-    
-# class ClientPaymentStatus(models.Model):
-#     prescription_id = models.ForeignKey(Prescription, on_delete=models.SET_NULL, null=True, related_name="prescription_receipt_id",)
-#     stripe_session_id = models.CharField(max_length=250, editable=False)
-#     stripe_payment_intent = models.CharField(max_length=250, editable=False)
-#     stripe_payment_method_types = models.CharField(max_length=250, editable=False)
-#     stripe_payment_status = models.CharField(max_length=250, editable=False)
-    
-#     def save(self, *args, **kwargs):
-#         if not self.stripe_session_id:
-            
+
+
+# Retrieve and add payment details from session data
+class ClientPaymentData(models.Model):
+    prescription_id = models.ForeignKey(
+        Prescription,
+        on_delete=models.CASCADE,
+        null=True,
+        related_name="prescription_receipt_id"
+    )
+    session_id = models.CharField(max_length=250)
+    payment_intent = models.CharField(max_length=250, blank=True, null=True)
+    payment_method = models.CharField(max_length=250, blank=True, null=True)
+    client_billing_address = models.CharField(max_length=250, blank=True, null=True)
+    stripe_session_status = models.CharField(max_length=250, blank=True, null=True)
+    stripe_payment_status = models.CharField(max_length=250, blank=True, null=True)
+    session_created_on = models.CharField(max_length=250, blank=True, null=True)
+    session_expired_on = models.CharField(max_length=250, blank=True, null=True)
+
+    def __str__(self):
+        return f"PaymentData for Prescription ID {self.prescription_id}"
+
+
+
+
     

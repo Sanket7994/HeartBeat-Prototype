@@ -8,9 +8,9 @@ from twilio.rest import Client
 
 # send sms notification to patient
 def send_sms_notification_patient(patient, staff_member):
-    relatedRecipient_firstName = staff_member.get("first_name")
-    relatedRecipient_lastName = staff_member.get("last_name")
-    patientNumber = "".join(list(patient.get("contact_number")))
+    relatedRecipient_firstName = staff_member.get("staff_first_name")
+    relatedRecipient_lastName = staff_member.get("staff_last_name")
+    patientNumber = "".join(list(patient.get("patient_contact_number")))
 
     account_sid = settings.TWILIO_ACCOUNT_SID
     auth_token = settings.TWILIO_AUTH_TOKEN
@@ -37,8 +37,8 @@ TestProject Support Team
 
 # send sms notification to staff_member
 def send_sms_notification_staff_member(staff_member):
-    relatedRecipient_firstName = staff_member.get("first_name")
-    staff_memberNumber = "".join(list(staff_member.get("contact_number")))
+    relatedRecipient_firstName = staff_member.get("staff_first_name")
+    staff_memberNumber = "".join(list(staff_member.get("staff_contact_number")))
     print(staff_memberNumber)
 
     account_sid = settings.TWILIO_ACCOUNT_SID
