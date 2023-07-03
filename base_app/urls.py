@@ -4,10 +4,9 @@ from . import views
 from .views import MyTokenObtainPairView, LogoutView
 from .views import ClinicListView, StaffRelationshipManagementView
 from .views import AppointmentManagement, PharmacyInventoryManagement, PrescriptionManagement
-from .views import PingView, LoginView, SignupView, ForgotPasswordView, ResetPasswordView, UserRetrieveUpdateAPIView, VerifyOTPView
-from .views import ResendOTP, PrescribedMedicationModelHistory
+from .views import PingView, LoginView, SignupView, ForgotPasswordView
+from .views import ResendOTP, ResetPasswordView, UserRetrieveUpdateAPIView, VerifyOTPView
 from .views import FetchPrescriptReceipt, PrescriptionPaymentCheckoutSessionView, CancelPaymentView, SuccessPaymentView
-
 
 
 
@@ -43,16 +42,14 @@ urlpatterns = [
     path('clinic/scheduler/appointments/update/<str:appointment_id>/', AppointmentManagement.as_view(), name='update-appointment'),
     path('clinic/scheduler/appointments/delete/<str:appointment_id>/', AppointmentManagement.as_view(), name='delete-appointment'),
     
-    path('clinic/scheduler/appointments/prescription/create/', PharmacyInventoryManagement.as_view(), name='new-drug'),
-    path('clinic/scheduler/appointments/prescription/view/', PrescriptionManagement.as_view(), name='create-prescription'),
-    path('pharmacy/prescribed-med/<str:prescription_id>/', PrescribedMedicationModelHistory.as_view(), name='med-history'),
+    path('clinic/scheduler/appointments/prescription/create/', PrescriptionManagement.as_view(), name='create-prescription'),
+    path('clinic/scheduler/appointments/prescription/view/', PrescriptionManagement.as_view(), name='view-prescription'),
     path('prescription/fetch/appointment_id=<str:appointment_id>&prescription_id=<str:prescription_id>', FetchPrescriptReceipt.as_view(), name='upload-prescription'),
     
     path('config/', views.stripe_config),
     path('payment/create-checkout-session/<str:prescription_id>/', PrescriptionPaymentCheckoutSessionView.as_view(), name='create-checkout-session'),
     path('payment/success', SuccessPaymentView.as_view(), name='success-payment-view'),
     path('payment/cancel', CancelPaymentView.as_view(), name='cancel-payment-view'),    
-    
     
     path('pharmacy/inventory/add/', PharmacyInventoryManagement.as_view(), name='new-drug'),
     path('pharmacy/inventory/list/', PharmacyInventoryManagement.as_view(), name='view-drug-list'),

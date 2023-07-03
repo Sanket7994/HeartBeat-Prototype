@@ -1,6 +1,4 @@
 # Within the project directory
-from typing import Any
-from django import http
 from .models import (
     CustomUser,
     Clinic,
@@ -8,7 +6,6 @@ from .models import (
     PatientAppointment,
     PharmacyInventory,
     Prescription,
-    PrescribedMedicationModel,
     ClientPaymentData,
 )
 from .serializer import (
@@ -19,7 +16,6 @@ from .serializer import (
     AppointmentSerializer,
     PharmacyInventorySerializer,
     PrescriptionSerializer,
-    PrescribedMedicationModelSerializer,
     ClientPaymentDataSerializer,
 )
 from .emails import (
@@ -34,7 +30,7 @@ from .emails import (
 from .filter import clean_data
 from .sms import send_sms_notification_patient, send_sms_notification_staff_member
 from .otp_maker import generate_time_based_otp, is_otp_valid
-from .prescription_fetch import (fetch_prescription_data, create_payment_link)
+from .helper_functions import (fetch_master_data, create_payment_link, DecimalEncoder)
 from .serializer import (
     ForgotPasswordSerializer,
     ResetPasswordSerializer,
@@ -60,9 +56,11 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 
 # External Django libraries and modules
+import json
 import requests
 import datetime
 import stripe, logging
+from decimal import Decimal
 from datetime import date
 from datetime import timedelta
 from django.dispatch import Signal
@@ -952,24 +950,50 @@ class PharmacyInventoryManagement(APIView):
 
 ############################################################################################################################
 
-
 # Prescription Creation View
+
 class PrescriptionManagement(APIView):
     permission_classes = [permissions.AllowAny]
 
-    # Create a new Prescription
+    # Add Prescription
     def post(self, request):
         data = {
             "clinic_name": request.data.get("clinic_name"),
             "consultant": request.data.get("consultant"),
             "appointment_id": request.data.get("appointment_id"),
-            "medications": request.data.get("medication"),
-            "med_bill_amount": request.data.get("med_bill_amount"),
+            "medications_json": request.data.get("medications_json"),
             "coupon_discount": request.data.get("coupon_discount"),
-            "grand_total": request.data.get("grand_total"),
-            "description": request.data.get("description"),
-        }
+            "description": request.data.get("description")}
+        
+        updated_medications_json = []
+        try:
+            for med in data.get("medications_json", []):
+                quantity = med.get('quantity')
+                drug_id = med.get('drug_id')
+                dosage_freq = med.get('dosage_freq')
+                verified_data = PharmacyInventory.objects.get(drug_id=drug_id)
+                medication = {
+                    "medicine_id": verified_data.drug_id,
+                    "medicine_name": verified_data.drug_name,
+                    "purpose": verified_data.drug_class,
+                    "quantity": quantity,
+                    "amount_per_unit": verified_data.price,
+                    "total_payable_amount": Decimal(int(verified_data.price) * int(quantity)),\
+                    "stripe_price_id": verified_data.stripe_price_id,
+                    "dosage_freq": dosage_freq
+                }
+                updated_medications_json.append(medication)
+                
+        except PharmacyInventory.DoesNotExist:
+            return Response({"error": "PharmacyInventory with drug_id {} does not exist.".format(drug_id)}, 
+                            status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Converting nested list to valid json format
+        data["medications_json"] = json.dumps(updated_medications_json, cls=DecimalEncoder)
 
+        # Finally validating through serializer
         serializer = PrescriptionSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -1031,43 +1055,6 @@ class PrescriptionManagement(APIView):
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# View alloted medication in all prescriptions
-class PrescribedMedicationModelHistory(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request, prescription_id, *args, **kwargs):
-        try:
-            queryset = PrescribedMedicationModel.objects.filter(
-                for_prescription_id=prescription_id
-            )
-
-            # Applying pagination
-            set_limit = self.request.GET.get("limit")
-            paginator = Paginator(queryset, set_limit)
-            page_number = self.request.GET.get("page")
-            # Use GET instead of data to retrieve the page number
-            page_obj = paginator.get_page(page_number)
-            serializer = PrescribedMedicationModelSerializer(page_obj, many=True)
-
-            # result dictionary
-            payload = {
-                "Page": {
-                    "totalRecords": queryset.count(),
-                    "current": page_obj.number,
-                    "next": page_obj.has_next(),
-                    "previous": page_obj.has_previous(),
-                    "totalPages": page_obj.paginator.num_pages,
-                },
-                "Result": serializer.data,
-            }
-            return Response(
-                payload,
-                status=status.HTTP_200_OK,
-            )
-        except Exception as e:
-            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
 ############################################################################################################################
 
 # View request to retrieve and share prescription related data
@@ -1090,9 +1077,9 @@ class FetchPrescriptReceipt(APIView):
         
         # Now fetch the data according to the parameter value
         try:
-            prescription_dict = fetch_prescription_data(appointment_id=appointment_id, prescription_id=prescription_id)
+            collected_data = fetch_master_data(appointment_id=appointment_id, prescription_id=prescription_id)
             return Response(
-                data={"masterData": prescription_dict}, status=status.HTTP_200_OK)
+                data={"masterData": collected_data}, status=status.HTTP_200_OK)
         except Exception as e:
             return HttpResponse(f"Error occurred: {str(e)}", status=500)
 
@@ -1113,7 +1100,7 @@ class PrescriptionPaymentCheckoutSessionView(APIView):
         try:
             stripe.api_key = settings.STRIPE_SECRET_KEY
             # Fetching the data related to the unique prescription_id
-            prescription_dict = fetch_prescription_data(appointment_id=None, prescription_id=prescription_id)
+            prescription_dict = fetch_master_data(appointment_id=None, prescription_id=prescription_id)
 
             # Generating the line items for the checkout session
             items = create_payment_link(prescription_dict, return_items="line_items")

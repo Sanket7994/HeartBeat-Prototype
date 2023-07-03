@@ -8,7 +8,6 @@ from .models import (
     PatientAppointment,
     Prescription,
     PharmacyInventory,
-    PrescribedMedicationModel,
     ClientPaymentData,
 )
 
@@ -136,30 +135,9 @@ class PharmacyInventorySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-# Prescribed medical information with quality
-class PrescribedMedicationModelSerializer(serializers.ModelSerializer):
-    medicine_name = serializers.CharField(source="medicine.drug_name")
-    prescription_id = serializers.CharField(source="for_prescription.prescription_id")
-
-    class Meta:
-        model = PrescribedMedicationModel
-        depth = 1
-        fields = (
-            "for_prescription_id",
-            "medicine_id",
-            "medicine_name",
-            "purpose",
-            "quantity",
-            "amount_per_unit",
-            "total_payable_amount",
-            "dosage_freq",
-        )
-
-
 # Prescription Information
 class PrescriptionSerializer(serializers.ModelSerializer):
     created_at = serializers.ReadOnlyField()
-    medications = PrescribedMedicationModelSerializer(many=True)
 
     class Meta:
         model = Prescription
@@ -168,7 +146,7 @@ class PrescriptionSerializer(serializers.ModelSerializer):
             "clinic_name",
             "consultant",
             "appointment_id",
-            "medications",
+            "medications_json",
             "stripe_appointment_service_id",
             "stripe_appointment_price_id",
             "appointment_fee",
@@ -180,6 +158,7 @@ class PrescriptionSerializer(serializers.ModelSerializer):
             "payment_status",
             "created_at",
         )
+
 
 
 # Payment serialization
