@@ -2,11 +2,11 @@
 Django settings for school project.
 
 """
-
+import os
+import logging.config
 from pathlib import Path
 from datetime import timedelta
-import os
-import logging
+from django.utils.log import DEFAULT_LOGGING
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,7 +38,8 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_countries",
-    "base_app",]
+    "base_app",
+]
 
 
 MIDDLEWARE = [
@@ -75,14 +76,12 @@ REST_FRAMEWORK = {
     ),
     # 'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     # 'PAGE_SIZE': 50,
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
-    'PAGE_SIZE': 100,
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "PAGE_SIZE": 100,
     "DATETIME_FORMAT": "%b %d at %I:%M %P",
 }
 
-AUTHENTICATION_BACKENDS = (
-    ('django.contrib.auth.backends.ModelBackend'),
-)
+AUTHENTICATION_BACKENDS = (("django.contrib.auth.backends.ModelBackend"),)
 
 
 SIMPLE_JWT = {
@@ -91,7 +90,6 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,
-
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
     "VERIFYING_KEY": "",
@@ -100,23 +98,18 @@ SIMPLE_JWT = {
     "JSON_ENCODER": None,
     "JWK_URL": None,
     "LEEWAY": 0,
-
     "AUTH_HEADER_TYPES": ("Bearer",),
     "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
     "USER_AUTHENTICATION_RULE": "rest_framework_simplejwt.authentication.default_user_authentication_rule",
-
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_TYPE_CLAIM": "token_type",
     "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
-
     "JTI_CLAIM": "jti",
-
     "SLIDING_TOKEN_REFRESH_EXP_CLAIM": "refresh_exp",
     "SLIDING_TOKEN_LIFETIME": timedelta(minutes=5),
     "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(days=1),
-
     "TOKEN_OBTAIN_SERIALIZER": "rest_framework_simplejwt.serializers.MyTokenObtainPairSerializer",
     "TOKEN_REFRESH_SERIALIZER": "rest_framework_simplejwt.serializers.TokenRefreshSerializer",
     "TOKEN_VERIFY_SERIALIZER": "rest_framework_simplejwt.serializers.TokenVerifySerializer",
@@ -128,7 +121,7 @@ SIMPLE_JWT = {
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, 'templates')],
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -208,17 +201,14 @@ DEFAULT_FROM_EMAIL = "vidlystore@gmail.com"
 EMAIL_HOST_PASSWORD = "fmiqguuvufqsugvx"
 EMAIL_PORT = 587
 
-# Stripe 
-YOUR_DOMAIN = 'http://127.0.0.1:8000'
+# Stripe
+YOUR_DOMAIN = "http://127.0.0.1:8000"
 STRIPE_PUBLIC_KEY = "pk_test_51NKxAZSFXVKGwTOE3k746d8zjMGt96O4knpOzN4JYh4U8cqAuSEZWLFEGHdCdIAWifpdaW9O3qpvRwtu7KFFP9Pa003CdiLm9V"
 STRIPE_SECRET_KEY = "sk_test_51NKxAZSFXVKGwTOE3rbvA7SELiFfxathCQTnJ61bRcQGmvyOxHgCOzTKHhwrvJQpyTV1KWkH2yVbMvpVP5ywM6bb000PUpwvWd"
-STRIPE_WEBHOOK_SECRET = "whsec_1146861ee145904c9eefb1365b7bedfb619e203275fb6e2113b9ef2573d95b70"
+STRIPE_WEBHOOK_SECRET = (
+    "whsec_1146861ee145904c9eefb1365b7bedfb619e203275fb6e2113b9ef2573d95b70"
+)
 
-WKHTMLTOPDF_CMD= '/usr/bin/wkhtmltopdf'
 
-
-
-GRAPH_MODELS = {
-  'all_applications': True,
-  'group_models': True,
-}
+# Calling Logger
+from .logger import LOGGING

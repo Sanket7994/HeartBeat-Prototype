@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>PRESCRIPTION TEMPLATE</title>
+
+    <!--STYLE CSS-->
+    <style>
+        body {
+            background: #c6c4c4;
+            margin-top: 20px;
+        }
+
+        .text-danger strong {
+            color: #9f181c;
+        }
+
+        .receipt-main {
+            background: #ffffff none repeat scroll 0 0;
+            border-bottom: 12px solid #333333;
+            border-top: 12px solid #9f181c;
+            margin-top: 50px;
+            margin-bottom: 50px;
+            padding: 40px 30px !important;
+            position: relative;
+            box-shadow: 0 1px 21px #acacac;
+            color: #333333;
+            font-family: open sans;
+        }
+
+        .receipt-main p {
+            color: #333333;
+            font-family: open sans;
+            line-height: 1.42857;
+        }
+
+        .receipt-footer h1,
+        .receipt-footer input[type="text"] {
+            font-size: 15px;
+            font-weight: 400 !important;
+            margin: 0 !important;
+        }
+
+        .receipt-main::after {
+            background: #414143 none repeat scroll 0 0;
+            content: "";
+            height: 5px;
+            left: 0;
+            position: absolute;
+            right: 0;
+            top: -13px;
+        }
+
+        .receipt-main thead {
+            background: #414143 none repeat scroll 0 0;
+        }
+
+        .receipt-main thead th {
+            color: #fff;
+        }
+
+        .receipt-right h5 {
+            font-size: 16px;
+            font-weight: bold;
+            margin: 0 0 7px 0;
+        }
+
+        .receipt-right p {
+            font-size: 12px;
+            margin: 0px;
+        }
+
+        .receipt-right p i {
+            text-align: center;
+            width: 18px;
+        }
+
+        .receipt-main td {
+            padding: 9px 20px !important;
+        }
+
+        .receipt-main th {
+            padding: 13px 20px !important;
+        }
+
+        .receipt-main td {
+            font-size: 13px;
+            font-weight: initial !important;
+        }
+
+        .receipt-main td p:last-child {
+            margin: 0;
+            padding: 0;
+        }
+
+        .receipt-main td h2 {
+            font-size: 20px;
+            font-weight: 900;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .receipt-header-mid .receipt-left h1 {
+            font-weight: 100;
+            margin: 34px 0 0;
+            text-align: right;
+            text-transform: uppercase;
+        }
+
+        #container {
+            background-color: #dcdcdc;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div id="printableArea">
+        <div class="container" style="height: 1200px; width: 950px;">
+            <div class="col-md-12">
+                <div class="row">
+                    <div
+                        class="receipt-main col-xs-10 col-sm-10 col-md-6 col-xs-offset-1 col-sm-offset-1 col-md-offset-3">
+                        <div style="display: flex; justify-content: space-between;">
+                            <div class="row"
+                                style="display: flex; flex-direction: column; justify-content: space-between;">
+                                <div class="receipt-header">
+                                    <div class="col-xs-6 col-sm-6 col-md-6">
+                                        <div class="receipt-left">
+                                            <img class="img-responsive" src="../static/output-onlinepngtools (1).png"
+                                                style="width: 400px; height: 100px;">
+                                        </div>
+                                    </div>
+                                    <div class="col-xs-6 col-sm-6 col-md-6 text-right">
+                                        <div class="receipt-right">
+                                            <h2 id="clinic_name" class="clinic-heading">{{ clinic_name }}</h2>
+                                            <p id="clinic_contact_number" class="clinic-info"><i
+                                                    class="fa fa-phone"></i> {{ clinic_contact_number }}</p>
+                                            <p id="clinic_email" class="clinic-info"><i class="fa fa-envelope-o"></i>
+                                                {{ clinic_email }}</p>
+                                            <p id="clinic_address" class="clinic-info"><i
+                                                    class="fa fa-location-arrow"></i> {{ clinic_address }}</p>
+                                            <p id="clinic_city" class="clinic-info">{{ clinic_city }}</p>
+                                            <p id="clinic_country" class="clinic-info"> - Zipcode:
+                                                <p id="clinic_zipcode">{{ clinic_zipcode }}</p>
+                                                </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row"
+                                style="display: flex; flex-direction: column; justify-content: space-between;">
+                                <div class="receipt-header receipt-header-mid">
+                                    <div class="col-xs-8 col-sm-8 col-md-8 text-left">
+                                        <div class="col-xs-4 col-sm-4 col-md-4">
+                                            <h2>PRESCRIPTION ID <br>
+                                                #<span style="font-size: 22px;" id="prescription_id">{{ prescription_id }}</span></h2>
+                                        </div>
+                                        <br>
+                                        <div class="receipt-right">
+                                            <h5>PATIENT DETAILS</h5>
+                                            <p><b>Name :</b> {{ patient_name }}</p>
+                                            <p><b>Gender :</b> {{ patient_gender }}</p>
+                                            <p><b>Age :</b> {{ patient_age }} years</p>
+                                            <p><b>Appointment Date :</b> {{ appointment_date }}</p>
+                                            <p><b>Mobile :</b>{{ patient_contact_number }} </p>
+                                            <p><b>Recurring Patient :</b> {{ recurring_patient }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <br>
+                        <div>
+                            <table class="table table-bordered"
+                                style="width: 100%; border: 1px solid rgb(208, 207, 207); border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 25%;">Medication Name</th>
+                                        <th style="width: 35%;">Purpose</th>
+                                        <th style="width: 10%;">Frequency</th>
+                                        <th style="width: 10%;">Quantity</th>
+                                        <th style="width: 20%;">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="prescriptionTableBody">
+                                    {% for medication in medications %}
+                                    <tr>
+                                        <td>{{ medication.name }}</td>
+                                        <td>{{ medication.purpose }}</td>
+                                        <td>{{ medication.frequency }}</td>
+                                        <td>{{ medication.quantity }}</td>
+                                        <td>{{ medication.amount }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tbody>
+                                    <tr>
+                                        <td class="text-right" style="text-align: right;">
+                                            <p>
+                                                <strong>Medicine Amount: </strong>
+                                            </p>
+                                            <p>
+                                                <strong>Appointment Fees: </strong>
+                                            </p>
+                                            <p>
+                                                <strong>Coupon Discount: </strong>
+                                            </p>
+                                            <p>
+                                                <strong>Tax: </strong>
+                                            </p>
+                                        <td>
+                                            <p>
+                                                <i class="fa fa-usd" aria-hidden="true"></i>
+                                                <strong id="med_bill_amount">{{ med_bill_amount }}</strong>
+                                            </p>
+                                            <p>
+                                                <i class="fa fa-usd" aria-hidden="true"></i>
+                                                <strong id="appointment_fee">{{ appointment_fee }}</strong>
+                                            </p>
+                                            <p>
+                                                -<i class="fa fa-usd" aria-hidden="true"></i>
+                                                <strong id="applied_discount_coupon">{{ applied_discount_coupon }}</strong>
+                                            </p>
+                                            <p>
+                                                <i class="fa fa-usd" aria-hidden="true"></i>
+                                                <strong id="tax_deduction">{{ tax_deduction }}</strong>
+                                            </p>
+                                        </td>
+                                    </tr>
+                                    <tr style="width: 100%;">
+                                        <td class="text-right"
+                                            style="width: 85%; text-align: right; border: 1px solid rgb(208, 207, 207); border-collapse: collapse;">
+                                            <h2><strong>Total Payable Amount: </strong></h2>
+                                        </td>
+                                        <td class="text-left text-danger"
+                                            style="width: 15%; border: 1px solid rgb(208, 207, 207); border-collapse: collapse;">
+                                            <h2 style="color: firebrick;"><i class="fa fa-usd"
+                                                    aria-hidden="true"></i><strong id="grand_total">{{ grand_total }}</strong></h2>
+                                            </h2>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <h3>ADDITIONAL ADVICE: </b><span id="prescription_note" style="font-size: 15px;">{{ prescription_note }}</span></h5>
+                            <br>
+                            <div class="row">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <div class="col-xs-8 col-sm-8 col-md-8 text-left">
+                                        <div class="receipt-right">
+                                            <h3>Dr. <span id="consultant_name">{{ consultant_name }}</span></h3>
+                                            <p id="consultant_designation">{{ consultant_designation }}</p>
+                                            <p id="consultant_contact_number"><i class="fa fa-phone"></i> {{ consultant_contact_number }}</p>
+                                            <p id="consultant_email"><i class="fa fa-envelope-o"></i> {{ consultant_email }}</p>
+                                            <p style="text-align: left;">
+                                                <img id="signatureImageElement" src="{{ consultant_signature_image }}"
+                                                    style="width: 100px; height: 50px;">
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="col-xs-4 col-sm-4 col-md-4">
+                                        <div class="receipt-left">
+                                            <h3>SEAL OF AUTHORIZATION</h3>
+                                            <p style="text-align: center;">
+                                                <img id="imageElement" src="{{ authorization_image }}" alt="Authorized Image"
+                                                    style="width: 150px; height: 140px;">
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <br>
+                            <!--UTILITY TOOLS-->
+                            <div class="row">
+                                <div class="receipt-header receipt-header-mid receipt-footer"
+                                    style="display: flex; justify-content: space-between;">
+                                    <div class="col-xs-8 col-sm-8 col-md-8 text-left">
+                                        <div class="receipt-right">
+                                            <p id="created_at"><b>Date :</b> {{ created_at }}</p>
+                                            <h5 style="color: rgb(78, 98, 196);">Thanks for Visiting.!</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,7 +1,9 @@
 # IMPORTS
 import json
+import requests
 from decimal import Decimal
 import stripe, logging
+from django.shortcuts import render
 from django.db.models import F
 from django.conf import settings
 from .views import (
@@ -137,3 +139,37 @@ class DecimalEncoder(json.JSONEncoder):
         if isinstance(o, Decimal):
             return str(o)
         return super().default(o)
+    
+    
+    
+
+
+def fetch_data_and_render_template(request, appointment_id, prescription_id):
+    # Construct the API URL with the provided parameters
+    api_url = f"http://127.0.0.1:8000/prescription/fetch/appointment_id={appointment_id}&prescription_id={prescription_id}"
+
+    # Checking parameter type
+    if appointment_id == 'None':
+        appointment_id = None
+    if prescription_id == 'None':
+        prescription_id = None
+    elif appointment_id is None and prescription_id is None:
+        raise ValueError("At least one of 'appointment_id' or 'prescription_id' must be provided.")
+    elif appointment_id is not None and prescription_id is not None:
+        raise ValueError("This url only supports one parameter with a non-null value.")
+    
+    # Now fetch the data according to the parameter value
+    try:
+        # Make the API request to fetch the data
+        response = requests.get(api_url)
+        data = response.json()
+    except requests.exceptions.RequestException as e:
+        # Handle any errors that occurred during the API request
+        data = None
+        error_message = str(e)
+    
+    # Render the template with the fetched data
+    return render(request, '../templates/prescription_invoice.html', {'data': data, 'error_message': error_message})
+
+
+

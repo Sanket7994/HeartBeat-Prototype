@@ -5,10 +5,12 @@ from .models import (
     Clinic,
     ClinicMember,
     MedicalProceduresTypes,
+    ClientDataCollectionPool,
     PatientAppointment,
     Prescription,
     PharmacyInventory,
     ClientPaymentData,
+    # ClientServiceFeedback,
 )
 
 # To convert the Model object to an API-appropriate format like JSON,
@@ -126,6 +128,15 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return [procedure.procedure_choice for procedure in obj.procedures.all()]
 
 
+class ClientDataCollectionPoolSerializer(serializers.ModelSerializer):
+    profile_created_at = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = ClientDataCollectionPool
+        fields = "__all__"
+
+
+
 # Drug Inventory Information
 class PharmacyInventorySerializer(serializers.ModelSerializer):
     added_at = serializers.ReadOnlyField()
@@ -173,3 +184,10 @@ class ClientPaymentDataSerializer(serializers.ModelSerializer):
         if self.context['request'].method == 'PUT':
             raise serializers.ValidationError("Updating existing instances is not allowed.")
         return super().update(instance, validated_data)
+    
+    
+# # Star Rating feedback     
+# class ClientServiceFeedbackSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = ClientServiceFeedback
+#         fields = ['customer_id', 'rating', 'comment', 'created_at']

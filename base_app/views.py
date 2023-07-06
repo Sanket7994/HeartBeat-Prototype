@@ -1,9 +1,14 @@
+# This retrieves a Python logging instance (or creates it)
+import logging
+log = logging.getLogger(__name__)
+
 # Within the project directory
 from .models import (
     CustomUser,
     Clinic,
     ClinicMember,
     PatientAppointment,
+    ClientDataCollectionPool,
     PharmacyInventory,
     Prescription,
     ClientPaymentData,
@@ -14,6 +19,7 @@ from .serializer import (
     ClinicStaffSerializer,
     MedicalProceduresTypes,
     AppointmentSerializer,
+    ClientDataCollectionPoolSerializer,
     PharmacyInventorySerializer,
     PrescriptionSerializer,
     ClientPaymentDataSerializer,
@@ -59,10 +65,15 @@ from rest_framework_simplejwt.token_blacklist.models import (
 import json
 import requests
 import datetime
-import stripe, logging
+import stripe
+# For getting the operating system name
+import platform 
+# For executing a shell command
+import subprocess  
 from decimal import Decimal
 from datetime import date
 from datetime import timedelta
+from collections import defaultdict, Counter
 from django.dispatch import Signal
 from django.db.models import F
 from django.views import View
@@ -70,28 +81,43 @@ from django.shortcuts import render
 from django.conf import settings
 from django.http import JsonResponse
 from django.http import HttpResponse
-from django.views.generic.base import TemplateView
 from django.core.paginator import Paginator, EmptyPage
+from django.core.exceptions import ObjectDoesNotExist
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
-from django.middleware.csrf import get_token
 from django.contrib.auth.tokens import default_token_generator
-from django.http import HttpResponse
 from django.template.loader import render_to_string
 
 
 #####################################################################################################################
-class PingView(APIView):
+
+# Check Server Status
+class PingTest(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        return Response(
-            data={"user": request.data.get("email"), "message": "Server is running"}
-        )
+        """
+        Returns True if host (str) responds to a ping request.
+        Remember that a host may not respond to a ping (ICMP) request even if the host name is valid.
+        """
+        try:
+            host = settings.YOUR_DOMAIN
+            # Option for the number of packets as a function of the operating system
+            param = '-c' if platform.system().lower() == 'linux' else '-n'
+            # Building the command. Ex: "ping -c 1 example.com"
+            command = ['ping', param, '1', host]
+            # Execute the ping command and check the return status
+            status = subprocess.call(command) == 0
+            if status:
+                return Response(data={"message": "Server is reachable"})
+            else:
+                return Response(data={"message": "Server is not reachable"})
+        except Exception as e:
+            return Response(data={"message": str(e)})
 
 
 # User Account creation API
@@ -111,6 +137,7 @@ class SignupView(APIView):
 
             # Error case handling for User
             if is_email_exits.exists():
+                log.warning("email is already in use")
                 return Response(
                     data={"message": "Email already exists"},
                     status=status.HTTP_403_FORBIDDEN,
@@ -118,6 +145,7 @@ class SignupView(APIView):
 
             # Password Mismatch Case
             if password != confirm_password:
+                log.warning("password mismatch")
                 return Response(
                     data={"message": "Passwords don't match"},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -144,7 +172,6 @@ class SignupView(APIView):
                 is_clinic_management=is_clinic_management,
                 is_active=is_active,
             )
-
             # Generate and send the 6 digit OTP to the user's email address
             OTP = generate_time_based_otp()
 
@@ -156,9 +183,10 @@ class SignupView(APIView):
             # Email OTP verification
             send_email_notification([user], OTP)
             
+            log.info("Session Data saved! Notification email sent to %s.", user.email)
             # Saving user information temporarily till they verify
             user.save()
-            
+            log.info("New user registered, Account activation pending.")
             return Response(
                 data={
                     "message": "Your account has been registered now. To activate it, Confirm OTP."
@@ -166,6 +194,7 @@ class SignupView(APIView):
                 status=status.HTTP_200_OK,
             )
         except Exception as e:
+            log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -189,7 +218,8 @@ class ResendOTP(APIView):
                 # Increment tries and update session
                 count += 1
                 request.session["resend_otp_count"] = count
-
+                
+                log.info(f"{count} of 3 OTP Sent!")
                 return Response(
                     data={
                         "message": f"Attempt: {count} of 3: Email with a 6-digit OTP has been sent to {stored_email}. Please check your email."
@@ -197,6 +227,7 @@ class ResendOTP(APIView):
                     status=status.HTTP_200_OK,
                 )
             else:
+                log.warning("Max OTP attempts exceeded")
                 return Response(
                     data={
                         "message": "Maximum number of OTP resend attempts reached. Please contact support for assistance."
@@ -204,6 +235,7 @@ class ResendOTP(APIView):
                     status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
         except Exception as e:
+            log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -217,6 +249,7 @@ class VerifyOTPView(APIView):
             otp = serializer.validated_data["otp"]
 
         if is_otp_valid(otp) != True:
+            log.critical("OTP validation timed out!")
             return Response(
                 data={
                     "error_message": "OTP Expired. Try Again as It`s only valid for 10 mins!"
@@ -241,6 +274,7 @@ class VerifyOTPView(APIView):
                     del request.session["email"]
                     del request.session["otp"]
 
+                    log.info("Session data deleted and %s activated successfully", user.email)
                     return Response(
                         data={
                             "error_message": "Account verified successfully. You can now log in."
@@ -248,14 +282,13 @@ class VerifyOTPView(APIView):
                         status=status.HTTP_200_OK,
                     )
         except Exception as e:
+            log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 # User Account Login API
 class LoginView(APIView):
-    permission_classes = [
-        permissions.AllowAny,
-    ]
+    permission_classes = [permissions.AllowAny,]
 
     def post(self, request, *args, **kwargs):
         try:
@@ -267,6 +300,7 @@ class LoginView(APIView):
             try:
                 user = CustomUser.objects.get(email=email)
             except CustomUser.DoesNotExist:
+                log.error("Login Failed! User does not exist")
                 return Response(
                     {"message": "User with this email does not exist."},
                     status=status.HTTP_401_UNAUTHORIZED,
@@ -276,11 +310,13 @@ class LoginView(APIView):
             user = authenticate(request, email=email, password=password)
             # Error Case
             if user is None:
+                log.error("Login Failed due to invalid input.")
                 return Response(
                     data={"message": "Email or Password is incorrect"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             elif password is None:
+                log.error("Login Failed due to invalid password.")
                 return Response(
                     data={"message": "Enter the password to login!"},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -304,11 +340,13 @@ class LoginView(APIView):
                 "access": str(refresh_token.access_token),
                 "user_id": str(user.id),
             }
+
             user_logged_in = Signal()
             user_logged_in.send(sender=user.__class__, request=request, user=user)
-
+            log.info("User logged in successfully.")
             return Response(user_details, status=status.HTTP_202_ACCEPTED)
         except Exception as e:
+            log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -336,69 +374,67 @@ class LogoutView(APIView):
             refresh_token = request.data["refresh_token"]
             token = RefreshToken(refresh_token)
             token.blacklist()
-
+            log.info("Token Blacklisted and User logged out.")
             return Response(
                 {"message": "Logged out successfully"},
                 status=status.HTTP_200_OK,
             )
         except Exception as e:
+            log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # User Account Forgot Password API
 class ForgotPasswordView(APIView):
-    permission_classes = [
-        permissions.IsAuthenticated,
-    ]
+    permission_classes = [permissions.IsAuthenticated,]
 
     def post(self, request, *args, **kwargs):
         serializer = ForgotPasswordSerializer(data=request.data)
-        if serializer.is_valid():
-            email = serializer.validated_data["email"]
-            try:
-                user = CustomUser.objects.get(email=email)
+        try:
+            if serializer.is_valid():
+                email = serializer.validated_data["email"]
+                try:
+                    user = CustomUser.objects.get(email=email)
 
-            except CustomUser.DoesNotExist:
+                except CustomUser.DoesNotExist:
+                    log.error("User does not exist")
+                    return Response(
+                        {"message": "User with this email does not exist."},
+                        status=status.HTTP_404_NOT_FOUND,)
+
+                uid = urlsafe_base64_encode(force_bytes(str(user.pk)))
+                token = default_token_generator.make_token(user)
+
+                # Calling custom email generator
+                send_forget_password_mail(user, uid, token)
+                log.info("Forgot password email sent to %s", email)
                 return Response(
-                    {"message": "User with this email does not exist."},
-                    status=status.HTTP_404_NOT_FOUND,
+                    {"message": "Password reset email has been sent."},
+                    status=status.HTTP_200_OK,
                 )
-
-            uid = urlsafe_base64_encode(force_bytes(str(user.pk)))
-            token = default_token_generator.make_token(user)
-
-            # Calling custom email generator
-            send_forget_password_mail(user, uid, token)
-
-            return Response(
-                {"message": "Password reset email has been sent."},
-                status=status.HTTP_200_OK,
-            )
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            log.critical(str(serializer.errors))
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            log.error(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # User Account Reset Password API
 class ResetPasswordView(APIView):
-    permission_classes = [
-        permissions.IsAuthenticated,
-    ]
+    permission_classes = [permissions.IsAuthenticated,]
 
     def post(self, request, *args, **kwargs):
         try:
-            query_dict = {**request.query_params}
-
-            token = query_dict.get("token")[0]
-            uidb64 = query_dict.get("uid")[0]
+            token = request.query_params.get("token")
+            uidb64 = request.query_params.get("uid")
 
             uid = urlsafe_base64_decode(uidb64)
             user = CustomUser.objects.get(pk=uid)
 
-        except (TypeError, ValueError, OverflowError, CustomUser.DoesNotExist) as e:
-            print(e)
+        except (TypeError, ValueError, OverflowError, ObjectDoesNotExist) as e:
+            log.critical(str(e))
             return Response(
-                {"message": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST
-            )
+                {"message": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST)
 
         if default_token_generator.check_token(user, token):
             serializer = ResetPasswordSerializer(data=request.data)
@@ -407,14 +443,13 @@ class ResetPasswordView(APIView):
                 user.set_password(new_password)
                 user.save()
 
-                return Response(
-                    {"message": "Password reset successful."}, status=status.HTTP_200_OK
-                )
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response(
-            {"message": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST
-        )
+                log.info("Password reset successfully")
+                return Response({"message": "Password reset successful."}, status=status.HTTP_200_OK)
+            else:
+                log.error(serializer.errors)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        log.error("Invalid reset link.")
+        return Response({"message": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # USER PROFILE OPERATIONS
@@ -428,11 +463,13 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
         try:
             user_profile = CustomUser.objects.get(user__id=id)
         except CustomUser.DoesNotExist:
+            log.warning("User with id %s does not exist", id)
             return Response(
                 {"error": "User profile not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
         serializer = CustomSerializer(user_profile, partial=True)
+        log.info("Profile generated")
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     # Update user data
@@ -440,6 +477,7 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
         try:
             user_data = CustomUser.objects.get(user__id=id)
         except CustomUser.DoesNotExist:
+            log.warning("User with id %s does not exist", id)
             return Response(
                 {"error": "User profile not found."}, status=status.HTTP_404_NOT_FOUND
             )
@@ -456,31 +494,31 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
             serializer.save()
             # Sending user profile update notification email
             send_user_profile_update_notification([user_data])
-
+            
+            log.info("User profile updated & notification email sent to %s", data["email"])
             return Response(serializer.data, status=status.HTTP_200_OK)
         except ValidationError as e:
+            log.error(str(e))
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Delete user data
     def delete(self, request, id, *args, **kwargs):
         try:
-            try:
-                user_data = CustomUser.objects.get(user__id=id)
-            except CustomUser.DoesNotExist:
-                return Response(
-                    {"error": "User profile not found."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-            # Send User profile delete notification email
-            send_user_profile_delete_notification([user_data])
-            # Delete user profile
-            user_data.delete()
+            user_data = CustomUser.objects.get(user__id=id)
+        except ObjectDoesNotExist:
+            log.warning("User with id %s does not exist", id)
             return Response(
-                data={"message": "User profile deleted successfully"},
-                status=status.HTTP_204_NO_CONTENT,
-            )
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                {"error": "User profile not found."}, status=status.HTTP_404_NOT_FOUND,)
+
+        # Send User profile delete notification email
+        send_user_profile_delete_notification([user_data])
+
+        # Delete user profile
+        user_data.delete()
+
+        log.info("User profile deleted & notification email sent to %s", user_data.email)
+        return Response(
+            data={"message": "User profile deleted successfully"}, status=status.HTTP_204_NO_CONTENT,)
 
 
 ############################################################################################################################
@@ -492,7 +530,8 @@ class ClinicListView(APIView):
 
     # ADD
     def post(self, request, *args, **kwargs):
-        data = {
+        try:
+            data = {
             "clinic_name": request.data.get("clinic_name"),
             "clinic_address": request.data.get("clinic_address"),
             "clinic_city": request.data.get("clinic_city"),
@@ -505,13 +544,19 @@ class ClinicListView(APIView):
             "user": request.user.id,
         }
 
-        serializer = ClinicSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            serializer = ClinicSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                log.info("Clinic Added Successfully")
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            log.critical(str(serializer.errors))
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        except Exception as e:
+            log.error(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            
     # VIEW
     def get(self, request, *args, **kwargs):
         try:
@@ -553,24 +598,23 @@ class ClinicListView(APIView):
                 },
                 "Result": serializer.data,
             }
-
+            log.info("Request clinic payload loaded successfully")
             return Response(payload, status=status.HTTP_200_OK)
         except Exception as e:
+            log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     # DELETE
     def delete(self, request, clinic_id, *args, **kwargs):
         try:
-            member_data = Clinic.objects.get(clinic_id=clinic_id)
+            clinic_data = Clinic.objects.get(clinic_id=clinic_id)
         except Clinic.DoesNotExist:
-            return Response(
-                {"error": "Clinic not found."}, status=status.HTTP_404_NOT_FOUND
-            )
-        member_data.delete()
-        return Response(
-            data={"message": "Clinic data deleted successfully"},
-            status=status.HTTP_204_NO_CONTENT,
-        )
+            log.warning("Invalid Clinic ID provided")
+            return Response({"error": "Clinic not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        clinic_data.delete()
+        log.info("Clinic data with ID %s has been deleted", clinic_id)
+        return Response({"message": "Clinic data deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
 
 ############################################################################################################################
@@ -582,7 +626,8 @@ class StaffRelationshipManagementView(APIView):
 
     # ADD
     def post(self, request, *args, **kwargs):
-        data = {
+        try:
+            data = {
             "clinic_name": request.data.get("clinic_name"),
             "staff_first_name": request.data.get("staff_first_name"),
             "staff_last_name": request.data.get("staff_last_name"),
@@ -593,13 +638,18 @@ class StaffRelationshipManagementView(APIView):
             "staff_status": request.data.get("staff_status"),
         }
 
-        serializer = ClinicStaffSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+            serializer = ClinicStaffSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                log.info("Staff member added successfully")
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            log.error(serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            log.error(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            
     # LIST VIEW
     def get(self, request, *args, **kwargs):
         try:
@@ -623,6 +673,7 @@ class StaffRelationshipManagementView(APIView):
             }
 
             if filters:
+                log.debug("Filter triggered: %s", filters)
                 queryset = queryset.filter(**filters)
 
             # Creating a new variable "Availability" which check if staff is available
@@ -684,8 +735,10 @@ class StaffRelationshipManagementView(APIView):
                 },
                 "Result": result_data,
             }
+            log.info("Staff Member data generated successfully")
             return Response(payload, status=status.HTTP_200_OK)
         except Exception as e:
+            log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     # UPDATE
@@ -693,15 +746,16 @@ class StaffRelationshipManagementView(APIView):
         try:
             member_data = ClinicMember.objects.get(staff_id=staff_id)
         except ClinicMember.DoesNotExist:
-            return Response(
-                {"error": "Staff member not found."}, status=status.HTTP_404_NOT_FOUND
-            )
+            log.warning("Invalid staff ID provided")
+            return Response({"error": "Staff member not found."}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = ClinicStaffSerializer(member_data, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            log.info("Staff member ID %s has been updated", member_data.staff_id)
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-
+        
+        log.error(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     # DELETE
@@ -709,14 +763,13 @@ class StaffRelationshipManagementView(APIView):
         try:
             member_data = ClinicMember.objects.get(staff_id=staff_id)
         except ClinicMember.DoesNotExist:
-            return Response(
-                {"error": "Staff Member not found."}, status=status.HTTP_404_NOT_FOUND
-            )
+            log.warning("Invalid staff ID provided")
+            return Response({"error": "Staff Member not found."}, status=status.HTTP_404_NOT_FOUND)
+        
         member_data.delete()
+        log.info("Staff member ID %s has been deleted successfully", staff_id)
         return Response(
-            data={"message": "Staff Member data deleted successfully"},
-            status=status.HTTP_204_NO_CONTENT,
-        )
+            {"message": "Staff Member data deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
 
 ############################################################################################################################
@@ -726,14 +779,16 @@ class StaffRelationshipManagementView(APIView):
 class AppointmentManagement(APIView):
     permission_classes = [permissions.AllowAny]
 
-    # Create appointment
+    # Create a new Appointment
     def post(self, request):
-        data = {
+        try:
+            data = {
             "clinic_name": request.data.get("clinic_name"),
             "relatedDepartment": request.data.get("relatedDepartment"),
             "relatedRecipient": request.data.get("relatedRecipient"),
             "patient_first_name": request.data.get("patient_first_name"),
-            "patient_last_name": request.data.get("patient_last_name"),
+            "patient_last_name": request.data.get("patient_social_security_ID"),
+            "patient_social_security_ID": request.data.get("patient_last_name"),
             "patient_gender": request.data.get("patient_gender"),
             "patient_contact_number": request.data.get("patient_contact_number"),
             "patient_email": request.data.get("patient_email"),
@@ -741,32 +796,42 @@ class AppointmentManagement(APIView):
             "appointment_date": request.data.get("appointment_date"),
             "appointment_slot": request.data.get("appointment_slot"),
             "status": request.data.get("status"),
-            "procedures": request.data.get("procedures"),
-        }
+            "procedures": request.data.get("procedures"),}
 
-        # Fetching data
-        queryset = ClinicMember.objects.filter(
-            staff_id=data.get("relatedRecipient")).values("staff_first_name", "staff_last_name", "staff_email", "staff_contact_number")[0]
+            # Fetching data
+            queryset = ClinicMember.objects.filter(staff_id=data.get("relatedRecipient")).values(
+                "staff_first_name", "staff_last_name", "staff_email", "staff_contact_number"
+            ).first()
 
-        # Sending Email Notifications
-        send_email_notification_to_staff(queryset)
-        send_email_notification_to_patient(data, queryset)
+            # Sending Email Notifications
+            send_email_notification_to_staff(queryset)
+            send_email_notification_to_patient(data, queryset)
+            log.info("Appointment creation notification email sent to both client and consultant.")
 
-        # Sending SMS Notifications
-        send_sms_notification_staff_member(queryset)
-        send_sms_notification_patient(data, queryset)
-
-        serializer = AppointmentSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # Sending SMS Notifications
+            send_sms_notification_staff_member(queryset)
+            send_sms_notification_patient(data, queryset)
+            log.info("Appointment creation notification SMS sent to both client and consultant.")
+            
+            serializer = AppointmentSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                
+                log.info("Appointment with ID %s created", serializer.appointment_id)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            log.critical(str(serializer.errors))
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        except Exception as e:
+            log.error(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST,)
 
     # View appointment List
     def get(self, request, appointment_id=None,*args, **kwargs):
         try:
             if appointment_id is None:
+                log.info("View all appointment data API triggered.")
                 queryset = queryset = PatientAppointment.objects.all().order_by("-created_at")
                 # filter and Search function for list
                 filter_params = {
@@ -797,6 +862,7 @@ class AppointmentManagement(APIView):
                 }
 
                 if filters:
+                    log.debug("Filter triggered: %s", filters)
                     queryset = queryset.filter(**filters)
 
                 # Applying pagination
@@ -818,16 +884,21 @@ class AppointmentManagement(APIView):
                     },
                     "Result": serializer.data,
                 }
+                log.info("All Appointment Data fetched Successfully")
                 return Response(payload, status=status.HTTP_200_OK,)
             else:
+                log.info("API view triggered for AID: %s", appointment_id)
                 appointment = PatientAppointment.objects.filter(appointment_id=appointment_id).order_by("-created_at").values().first()
                 selected_procedures = MedicalProceduresTypes.objects.filter(patientappointment=appointment["appointment_id"]).values()
                 staff = (ClinicMember.objects.filter(staff_id=str(appointment["relatedRecipient_id"])).values().first())
                 clinic = (Clinic.objects.filter(clinic_id=str(staff["clinic_name_id"])).values().first())
                 
                 appointment_dict = {**appointment, "selected_procedures": selected_procedures, **staff, **clinic,}
+                
+                log.info("Custom data generated for AID: %s" % appointment_id)
                 return Response({"masterData": appointment_dict}, status=status.HTTP_200_OK,)
         except Exception as e:
+            log.critical(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Update clinic data
@@ -835,30 +906,117 @@ class AppointmentManagement(APIView):
         try:
             queryset = PatientAppointment.objects.get(appointment_id=appointment_id)
         except PatientAppointment.DoesNotExist:
-            return Response(
-                {"error": "Appointment not found."}, status=status.HTTP_404_NOT_FOUND
-            )
+            log.warning("Invalid Appointment ID provided.")
+            return Response({"error": "Appointment not found."}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = AppointmentSerializer(queryset, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            log.info("AID %s updated successfully", appointment_id)
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
+        log.error(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
     # Delete clinic data
     def delete(self, request, appointment_id, *args, **kwargs):
         try:
             drug_data = PatientAppointment.objects.get(appointment_id=appointment_id)
         except PatientAppointment.DoesNotExist:
-            return Response(
-                {"error": "Drug not found."}, status=status.HTTP_404_NOT_FOUND
-            )
+            log.warning("Invalid appointment ID provided")
+            return Response({"error": "Drug not found."}, status=status.HTTP_404_NOT_FOUND)
         drug_data.delete()
-        return Response(
-            data={"message": "Data deleted successfully"},
-            status=status.HTTP_204_NO_CONTENT,
-        )
+        log.info("AID %s has been deleted successfully", appointment_id)
+        return Response(data={"message": "Data deleted successfully"}, status=status.HTTP_204_NO_CONTENT,)
+
+
+############################################################################################################################
+
+# Client Data
+class ClientDataManagement(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, *args, **kwargs):
+        try:
+            queryset = ClientDataCollectionPool.objects.all().order_by("-profile_created_at")
+
+            # filter and Search function for list
+            filter_params = {
+                "client_id": self.request.GET.get("client_id"),
+                "client_social_security_ID": self.request.GET.get("client_social_security_ID"),
+                "client_first_name": self.request.GET.get("client_first_name"),
+                "client_last_name": self.request.GET.get("client_last_name"),
+                "client_dob": self.request.GET.get("client_dob"),
+                "client_gender": self.request.GET.get("client_gender"),
+                "client_email": self.request.GET.get("client_email"),
+                "client_billing_address": self.request.GET.get("client_billing_address"),
+                "appointment_count": self.request.GET.get("appointment_count"),
+                "medical_procedure_history": self.request.GET.get("medical_procedure_history"),
+                "prescription_count": self.request.GET.get("prescription_count"),
+                "medication_history": self.request.GET.get("medication_history"),
+                "transactions_made": self.request.GET.get("transactions_made"),
+                "total_billings": self.request.GET.get("total_billings"),
+                "profile_last_updated": self.request.GET.get("profile_last_updated"),
+                "profile_created_at": self.request.GET.get("profile_created_at"),
+            }
+
+            # Parsing key and value into conditional filter
+            filters = {
+                field: value
+                for field, value in filter_params.items()
+                if value is not None
+            }
+
+            if filters:
+                queryset = queryset.filter(**filters)
+
+            # Applying pagination
+            set_limit = self.request.GET.get("limit")
+            paginator = Paginator(queryset, set_limit)
+            page_number = self.request.GET.get("page")
+            # Use GET instead of data to retrieve the page number
+            page_obj = paginator.get_page(page_number)
+            serializer = ClientDataCollectionPoolSerializer(page_obj, many=True)
+
+            # result dictionary
+            payload = {
+                "Page": {
+                    "totalRecords": queryset.count(),
+                    "current": page_obj.number,
+                    "next": page_obj.has_next(),
+                    "previous": page_obj.has_previous(),
+                    "totalPages": page_obj.paginator.num_pages,
+                },
+                "Result": serializer.data,}
+            
+            # Medical Procedure count based on patient consultation
+            key_counts = defaultdict(int)
+            for procedure in payload["Result"]:
+                individual_procedures = procedure["medical_procedure_history"]
+                for key in individual_procedures:
+                    key_counts[key] += 1
+            medProceduresCount = Counter(dict(key_counts))
+
+            # Total prescription and appointments created for patients
+            prescriptionCount = sum(int(prescription["prescription_count"]) for prescription in payload["Result"])
+            appointmentCount = sum(int(appointment["appointment_count"]) for appointment in payload["Result"])
+            totalBilling = sum(Decimal(revenue["total_billings"]) for revenue in payload["Result"])
+            averageBilling = totalBilling / Decimal(len(payload["Result"]))
+
+            # Adding a nest in the dictionary for respective variable
+            payload["Dashboard_stats"] = {
+                "total_medical_procedure_count": medProceduresCount,
+                "total_prescriptions_created": prescriptionCount,
+                "total_appointment_handled": appointmentCount,
+                "total_revenue_generated": totalBilling,
+                "average_patient_treatment_cost": averageBilling
+            }
+            log.info("Client data generated")
+            return Response(payload, status=status.HTTP_200_OK,)
+        except Exception as e:
+            log.error(str(e))
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 ############################################################################################################################
@@ -869,26 +1027,33 @@ class PharmacyInventoryManagement(APIView):
 
     # ADD DRUG
     def post(self, request):
-        data = {
-            "drug_name": request.data.get("drug_name"),
-            "generic_name": request.data.get("generic_name"),
-            "brand_name": request.data.get("brand_name"),
-            "drug_class": request.data.get("drug_class"),
-            "dosage_form": request.data.get("dosage_form"),
-            "unit_price": request.data.get("unit_price"),
-            "quantity": request.data.get("quantity"),
-            "manufacture_date": request.data.get("manufacture_date"),
-            "lifetime_in_months": request.data.get("lifetime_in_months"),
-            "expiry_date": request.data.get("expiry_date"),
-        }
+        try:
+            data = {
+                "drug_name": request.data.get("drug_name"),
+                "generic_name": request.data.get("generic_name"),
+                "brand_name": request.data.get("brand_name"),
+                "drug_class": request.data.get("drug_class"),
+                "dosage_form": request.data.get("dosage_form"),
+                "unit_price": request.data.get("unit_price"),
+                "quantity": request.data.get("quantity"),
+                "manufacture_date": request.data.get("manufacture_date"),
+                "lifetime_in_months": request.data.get("lifetime_in_months"),
+                "expiry_date": request.data.get("expiry_date"),
+            }
 
-        serializer = PharmacyInventorySerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            serializer = PharmacyInventorySerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                log.info("New Drug %s added successfully", serializer.drug_id)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            log.critical(serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        except Exception as e:
+            log.error(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST,)
+        
     # View Drug List
     def get(self, request, *args, **kwargs):
         try:
@@ -939,12 +1104,11 @@ class PharmacyInventoryManagement(APIView):
                 },
                 "Result": serializer.data,
             }
-            return Response(
-                payload,
-                status=status.HTTP_200_OK,
-            )
+            log.info("Drug data generated")
+            return Response(payload, status=status.HTTP_200_OK,)
 
         except Exception as e:
+            log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -965,8 +1129,10 @@ class PrescriptionManagement(APIView):
             "coupon_discount": request.data.get("coupon_discount"),
             "description": request.data.get("description")}
         
+        print(type(data['medications_json']))
         updated_medications_json = []
         try:
+            log.debug("Medications data fetching")
             for med in data.get("medications_json", []):
                 quantity = med.get('quantity')
                 drug_id = med.get('drug_id')
@@ -978,16 +1144,18 @@ class PrescriptionManagement(APIView):
                     "purpose": verified_data.drug_class,
                     "quantity": quantity,
                     "amount_per_unit": verified_data.price,
-                    "total_payable_amount": Decimal(int(verified_data.price) * int(quantity)),\
+                    "total_payable_amount": Decimal(int(verified_data.price) * int(quantity)),
                     "stripe_price_id": verified_data.stripe_price_id,
                     "dosage_freq": dosage_freq
                 }
                 updated_medications_json.append(medication)
-                
-        except PharmacyInventory.DoesNotExist:
+
+        except PharmacyInventory.DoesNotExist as p:
+            log.warning("Invalid Drug ID provided")
             return Response({"error": "PharmacyInventory with drug_id {} does not exist.".format(drug_id)}, 
                             status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            log.critical(str(e))
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
         # Converting nested list to valid json format
@@ -997,8 +1165,10 @@ class PrescriptionManagement(APIView):
         serializer = PrescriptionSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
+            log.info("New PID %s created successfully", serializer.data["prescription_id"])
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-
+        
+        log.error(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     # View Prescription
@@ -1019,10 +1189,7 @@ class PrescriptionManagement(APIView):
 
             # Parsing key and value into conditional filter
             filters = {
-                field: value
-                for field, value in filter_params.items()
-                if value is not None
-            }
+                field: value for field, value in filter_params.items() if value is not None}
 
             if filters:
                 queryset = queryset.filter(**filters)
@@ -1046,12 +1213,11 @@ class PrescriptionManagement(APIView):
                 },
                 "Result": serializer.data,
             }
-            return Response(
-                payload,
-                status=status.HTTP_200_OK,
-            )
+            log.info("Prescription data generated")
+            return Response(payload, status=status.HTTP_200_OK,)
 
         except Exception as e:
+            log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -1067,20 +1233,26 @@ class FetchPrescriptReceipt(APIView):
         
         # Checking parameter type
         if appointment_id == 'None':
+            log.debug("API with PID Triggered")
             appointment_id = None
         if prescription_id == 'None':
+            log.debug("API with AID Triggered")
             prescription_id = None
         elif appointment_id is None and prescription_id is None:
+            log.warning("API with no arguments passed.")
             raise ValueError("At least one of 'appointment_id' or 'prescription_id' must be provided.")
         elif appointment_id is not None and prescription_id is not None:
+            log.warning("API with both arguments passed.")
             raise ValueError("This url only supports one parameter with a non-null value.")
         
         # Now fetch the data according to the parameter value
         try:
             collected_data = fetch_master_data(appointment_id=appointment_id, prescription_id=prescription_id)
+            log.info(f"Custom data generated using {appointment_id} and {prescription_id}")
             return Response(
                 data={"masterData": collected_data}, status=status.HTTP_200_OK)
         except Exception as e:
+            log.error(str(e))
             return HttpResponse(f"Error occurred: {str(e)}", status=500)
 
 
@@ -1089,6 +1261,7 @@ class FetchPrescriptReceipt(APIView):
 def stripe_config(request):
     if request.method == 'GET':
         stripe_config = {'publicKey': settings.STRIPE_PUBLIC_KEY}
+        log.warning("Stripe Public Key triggered in frontend")
         return JsonResponse(stripe_config, safe=False)
 
 
@@ -1101,9 +1274,11 @@ class PrescriptionPaymentCheckoutSessionView(APIView):
             stripe.api_key = settings.STRIPE_SECRET_KEY
             # Fetching the data related to the unique prescription_id
             prescription_dict = fetch_master_data(appointment_id=None, prescription_id=prescription_id)
+            log.info("Custom Data with PID %s generated", prescription_id)
 
             # Generating the line items for the checkout session
             items = create_payment_link(prescription_dict, return_items="line_items")
+            log.info("Line items gathered")
             
             # Creating a checkout session with Stripe
             checkout_session = stripe.checkout.Session.create(
@@ -1113,25 +1288,26 @@ class PrescriptionPaymentCheckoutSessionView(APIView):
                 mode="payment",
                 line_items=items,
                 client_reference_id=prescription_id,
-                billing_address_collection = "required"
-            )
+                billing_address_collection = "required")
             
+            log.info("Checkout session created successfully")
             # Generating the payment link from stripe
             payment_url = checkout_session.url
 
             if payment_url is None:
+                log.critical("Failed to create payment link")
                 # Handle the error condition, such as returning an error response
                 return Response(
-                    data={"error": "Failed to create payment link"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                    data={"error": "Failed to create payment link"}, status=status.HTTP_400_BAD_REQUEST,)
                             
             # Sending the payment link to client via email
             send_pay_link_via_email(prescription_dict, payment_url)
+            log.info("Payment link shared to client via email")
         
             return JsonResponse({"sessionId": checkout_session.id})
         except Exception as e:
-                return Response(data={"Internal error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            log.error(str(e))
+            return Response(data={"Internal error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Success View
@@ -1140,6 +1316,7 @@ class SuccessPaymentView(View):
 
     def get(self, request, *args, **kwargs):
         session_id = request.GET.get('session_id')
+        log.debug("Payment Session initiated")
         try:
             stripe.api_key = settings.STRIPE_SECRET_KEY
             session_data = stripe.checkout.Session.retrieve(session_id)
@@ -1168,6 +1345,7 @@ class SuccessPaymentView(View):
             serializer = ClientPaymentDataSerializer(data=payment_data)
             if serializer.is_valid():
                 serializer.save()
+                log.info("Payment data saved")
 
             # Updating the payment status in prescription model
             related_prescription = Prescription.objects.get(prescription_id=prescription_id)
@@ -1176,16 +1354,21 @@ class SuccessPaymentView(View):
             serializer = PrescriptionSerializer(related_prescription, data=prescription_data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                log.info("Prescription data saved")
                 
             # When Payment has been successful send client a email notification for successful payment
             # and Product allotment
             
-                
+            
+            
+            log.info("Payment was successful, Session expired now")
             return HttpResponse(html_content, status=status.HTTP_200_OK)
         except stripe.error.StripeError as e:
             error_message = "A payment error occurred: {}".format(e.user_message)
+            log.critical(error_message)
             return JsonResponse({'error': error_message}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            log.critical(str(e))
             return JsonResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         

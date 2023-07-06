@@ -4,15 +4,15 @@ from . import views
 from .views import MyTokenObtainPairView, LogoutView
 from .views import ClinicListView, StaffRelationshipManagementView
 from .views import AppointmentManagement, PharmacyInventoryManagement, PrescriptionManagement
-from .views import PingView, LoginView, SignupView, ForgotPasswordView
+from .views import PingTest, LoginView, SignupView, ForgotPasswordView
 from .views import ResendOTP, ResetPasswordView, UserRetrieveUpdateAPIView, VerifyOTPView
 from .views import FetchPrescriptReceipt, PrescriptionPaymentCheckoutSessionView, CancelPaymentView, SuccessPaymentView
-
+from .views import ClientDataManagement
 
 
 
 urlpatterns = [
-    path('ping/', PingView.as_view(), name='ping'),
+    path('ping/', PingTest.as_view(), name='check-ping'),
     
     path('login/', LoginView.as_view(), name='login'),
     path('signup/', SignupView.as_view(), name='signup'),
@@ -36,6 +36,8 @@ urlpatterns = [
     path('clinic/allusers/add/', StaffRelationshipManagementView.as_view(), name='srm-add'),
     
     path('clinic/scheduler/appointments/availability/', AppointmentManagement.as_view(), name='check-availability'),
+    
+    path('client/view/', ClientDataManagement.as_view(), name='view-client-data'),
     path('clinic/scheduler/appointments/create/', AppointmentManagement.as_view(), name='new-appointment'),
     path('clinic/scheduler/appointments/view/', AppointmentManagement.as_view(), name='view-appointment'),
     path('clinic/scheduler/appointments/view/<str:appointment_id>/', AppointmentManagement.as_view(), name='view-specific-appointment'),

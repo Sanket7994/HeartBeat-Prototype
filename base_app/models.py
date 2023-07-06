@@ -2,6 +2,7 @@
 import uuid
 import stripe
 import json
+from collections import Counter
 from decimal import Decimal
 from django.utils import timezone
 from django.conf import settings
@@ -13,17 +14,13 @@ from django.contrib.auth.models import (
     BaseUserManager,
     PermissionsMixin,
 )
-import requests
-from django.db.models.signals import post_save
-from django.dispatch import receiver
+from django.db import models, transaction
 from django.core.exceptions import ValidationError
-from django.utils import timezone
+from django.core.validators import RegexValidator
 from django.utils.translation import gettext_lazy as _
 from phonenumber_field.modelfields import PhoneNumberField
-from django.core.validators import RegexValidator
-from django.contrib.sessions.models import Session
 from django_resized import ResizedImageField
-from django.db import models
+from django.utils.deconstruct import deconstructible
 
 
 # Custom User Model
@@ -156,7 +153,7 @@ class Clinic(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
     def __str__(self):
-        return self.clinic_name
+        return f"{self.clinic_id} : {self.clinic_name}"
     
     def get_full_address(self):
         return f"{self.clinic_address}, \n{self.clinic_city}, {self.clinic_country}, \nZipCode: {self.clinic_zipcode}"
@@ -249,7 +246,7 @@ class ClinicMember(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
     def __str__(self):
-        return f"{self.staff_first_name} {self.staff_last_name}"
+        return f"{self.staff_id} : {self.staff_first_name} {self.staff_last_name}"
 
     def save(self, *args, **kwargs):
         if not self.staff_id:
@@ -287,18 +284,19 @@ class MedicalProceduresTypes(models.Model):
         return self.procedure_choice
 
 
+
 # Create appointments
 class PatientAppointment(models.Model):
     class StatusCode(models.TextChoices):
-        APPROVED = ("APPROVED", "Approved")
-        PENDING = ("PENDING", "Pending")
-        CANCELLED = ("CANCELLED", "Cancelled")
+        APPROVED = "APPROVED", "Approved"
+        PENDING = "PENDING", "Pending"
+        CANCELLED = "CANCELLED", "Cancelled"
 
     class Gender(models.TextChoices):
         MALE = "MALE", "Male"
         FEMALE = "FEMALE", "Female"
         UNDISCLOSED = "UNDISCLOSED", "Undisclosed"
-        
+
     def validate_date(value):
         if value < timezone.now().date():
             raise ValidationError(_("Invalid date."))
@@ -326,6 +324,7 @@ class PatientAppointment(models.Model):
         null=True,
         related_name="recipient_name",
     )
+    patient_social_security_ID = models.CharField(max_length=10, unique=True, blank=True, null=True)
     patient_first_name = models.CharField(max_length=150)
     patient_last_name = models.CharField(max_length=150, null=False, blank=False)
     patient_gender = models.CharField(
@@ -360,13 +359,13 @@ class PatientAppointment(models.Model):
             patient_age = today.year - self.date_of_birth.year
 
             # Check if the birthday has already occurred this year
-            if today.month < self.date_of_birth.month or (
-                today.month == self.date_of_birth.month
-                and today.day < self.date_of_birth.day
-            ):
+            if (today.month < self.date_of_birth.month or 
+                (today.month == self.date_of_birth.month and 
+                 today.day < self.date_of_birth.day)):
                 patient_age -= 1
             self.patient_age = patient_age
 
+        # Saving Appointment reference number
         if not self.appointment_id:
             while True:
                 new_appointment_id = str(uuid.uuid4().hex[:10].upper())
@@ -375,43 +374,98 @@ class PatientAppointment(models.Model):
                 ).exists():
                     self.appointment_id = new_appointment_id
                     break
+
         super().save(*args, **kwargs)
-        
+
+        if self.procedures.exists():
+            count_dict = Counter(item.procedure_choice for item in self.procedures.all())
+            return count_dict
+            
+        # Check if patient exists in ClientDataCollectionPool
+        # by checking their unique social security ID
+        try:
+            with transaction.atomic():
+                client = ClientDataCollectionPool.objects.get(
+                    client_social_security_ID=self.patient_social_security_ID)
+
+        except ClientDataCollectionPool.DoesNotExist:
+            # Patient doesn't exist, create a new client
+            client = ClientDataCollectionPool()
+            client.client_social_security_ID = self.patient_social_security_ID
+            client.client_first_name = self.patient_first_name
+            client.client_last_name = self.patient_last_name
+            client.client_dob = self.date_of_birth
+            client.client_gender = self.patient_gender
+            client.client_contact_number = self.patient_contact_number
+            client.client_email = self.patient_email
+            client.appointment_count = 1
+            client.medical_procedure_history = count_dict
+            client.save()
+        else:
+            # Patient exists, update client contact fields
+            client.client_contact_number = self.patient_contact_number
+            client.client_email = self.patient_email
+            # Increment appointment count If patient is recurring 
+            client.appointment_count = int(client.appointment_count) + 1
+            # Update count of Medical procedures taken If patient is recurring 
+            updated_medical_procedure_history = dict(Counter(
+                **client.medical_procedure_history,
+                **self.procedures.values_list("procedure_choice", flat=True))
+            )
+            client.medical_procedure_history = updated_medical_procedure_history
+            client.save()
+
     def __str__(self):
         return self.appointment_id
 
 
 
-# AutoUpdating Patient Information
+# Auto update or create patient database
 class ClientDataCollectionPool(models.Model):
+    
+    @staticmethod
+    def default_json_fields():
+        return list
+    
     client_id = models.CharField(
         primary_key=True,
         max_length=50,
         editable=False,
         unique=True,
     )
-    client_first_name = models.CharField(max_length=250, blank=True, null=True)
-    client_last_name = models.CharField(max_length=250, blank=True, null=True)
-    client_dob = models.CharField(max_length=250, blank=True, null=True)
-    client_gender = models.CharField(max_length=250, blank=True, null=True)
-    client_contact_number = models.CharField(max_length=250, blank=True, null=True)
-    client_email = models.CharField(max_length=250, blank=True, null=True)
+    client_social_security_ID = models.CharField(max_length=10, unique=True, blank=True, null=True)
+    client_first_name = models.CharField(max_length=100, blank=True, null=True)
+    client_last_name = models.CharField(max_length=100, blank=True, null=True)
+    client_dob = models.DateField(blank=True, null=True)
+    client_gender = models.CharField(max_length=10, default="UNDISCLOSED")
+    client_contact_number = models.CharField(max_length=16, blank=True, null=True)
+    client_email = models.EmailField(max_length=250, blank=True, null=True)
     client_billing_address = models.CharField(max_length=250, blank=True, null=True)
-    appointment_count = models.IntegerField(default=0)
-    prescription_count = models.IntegerField(default=0)
-    total_billings = models.IntegerField(default=0)
+    appointment_count = models.IntegerField(default=0, blank=True, null=True)
+    medical_procedure_history = models.JSONField(default=default_json_fields, blank=True, null=True)
+    prescription_count = models.IntegerField(default=0, blank=True, null=True)
+    medication_history = models.JSONField(default=default_json_fields, blank=True, null=True)
+    transactions_made = models.JSONField(default=default_json_fields, blank=True, null=True)
+    total_billings = models.DecimalField(default=0.0, decimal_places=2, max_digits=10)
+    profile_last_updated = models.DateTimeField(auto_now=True)
+    profile_created_at = models.DateTimeField(auto_now_add=True, editable=False)
     
     def save(self, *args, **kwargs):
         if not self.client_id:
             while True:
-                new_client_id = str("CL-" + str(uuid.uuid4().hex[:5].upper()))
-                if not Prescription.objects.filter(client_id=new_client_id).exists():
+                new_client_id = str(f"CL-" + uuid.uuid4().hex[:5].upper())
+                if not ClientDataCollectionPool.objects.filter(client_id=new_client_id).exists():
                     self.client_id = new_client_id
                     break
+        super().save(*args, **kwargs)
+             
     def __str__(self):
-        return f"{self.client_first_name} {self.client_last_name}"
- 
+        return f"{self.client_id} : {self.client_first_name} {self.client_last_name}"
     
+    class ignored:
+        save = True
+
+
 # Pharmacy Drug Inventory
 class PharmacyInventory(models.Model):
     class DosageType(models.TextChoices):
@@ -530,8 +584,9 @@ class Prescription(models.Model):
         THRICE_A_DAY = "THRICE_A_DAY", "Thrice a day"
         FLEXIBLE = "FLEXIBLE", "Flexible timings"
 
+    @staticmethod
     def default_medications():
-        return []
+        return list
 
     prescription_id = models.CharField(
         primary_key=True,
@@ -572,14 +627,14 @@ class Prescription(models.Model):
     def save(self, *args, **kwargs):
         if self.medications_json:
             medications = json.loads(self.medications_json)
-            
-            total_med_amount = Decimal(0)  
+
+            total_med_amount = Decimal(0)
             for medicine in medications:
                 total_payable_amount = Decimal(medicine["total_payable_amount"])
                 total_med_amount += total_payable_amount
 
             # Adding appointment charge
-            self.appointment_fee = Decimal("100.00") 
+            self.appointment_fee = Decimal("100.00")
             self.med_bill_amount = total_med_amount
             self.grand_total = (self.med_bill_amount + self.appointment_fee) - self.coupon_discount
 
@@ -590,25 +645,57 @@ class Prescription(models.Model):
                     self.prescription_id = new_prescription_id
                     break
 
+        if self.medications_json:
+            medications = json.loads(self.medications_json)
+
+            # Extract the medicine IDs as keys and quantities as values for all medications
+            medicine_load = {}
+            for medication in medications:
+                medicine_id = medication['medicine_id']
+                quantity = medication['quantity']
+                medicine_load[medicine_id] = quantity
+        else:
+            medicine_load = {}
+            
+        # Dynamically Saving the client data to the database    
+        try:
+            with transaction.atomic():
+                client = ClientDataCollectionPool.objects.get(
+                    client_social_security_ID=self.appointment_id.patient_social_security_ID
+                )
+
+        except ClientDataCollectionPool.DoesNotExist:
+            return "ClientDataCollectionPool related issue!"
+        else:
+            # Convert client.medication_history from list to dictionary
+            if not isinstance(client.medication_history, dict):
+                medication_history_dict = {}
+                for medication in client.medication_history:
+                    medication_id = medication['medicine_id']
+                    quantity = medication['quantity']
+                    medication_history_dict[medication_id] = quantity
+                client.medication_history = medication_history_dict
+
+            # Increment prescription count if patient is recurring
+            client.prescription_count += 1
+            # Update count of medications taken if patient is recurring
+            updated_medication_history = {**client.medication_history, **medicine_load}
+            client.medication_history = updated_medication_history
+            client.total_billings += self.grand_total
+            client.save()
+
         if not self.stripe_appointment_service_id:
             stripe.api_key = settings.STRIPE_SECRET_KEY
-            product = stripe.Product.create(name="Appointment Fee")
-            self.stripe_appointment_service_id = product.id
+            self.stripe_appointment_service_id = "prod_O7aPUsz3hdJci5"
 
         if not self.stripe_appointment_price_id:
             stripe.api_key = settings.STRIPE_SECRET_KEY
-            price = stripe.Price.create(
-                product=self.stripe_appointment_service_id,
-                unit_amount=int(self.appointment_fee * 100),
-                currency="usd",
-            )
-            self.stripe_appointment_price_id = price.id
+            self.stripe_appointment_price_id = "price_1NLLEDSFXVKGwTOEQfFZMyW1"
 
         super().save(*args, **kwargs)
 
     def __str__(self):
         return str(self.prescription_id)
-
 
 
 # Retrieve and add payment details from session data
@@ -628,10 +715,57 @@ class ClientPaymentData(models.Model):
     session_created_on = models.CharField(max_length=250, blank=True, null=True)
     session_expired_on = models.CharField(max_length=250, blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                # Retrieve the related prescription object
+                prescription = self.prescription_id
+
+                # Retrieve the related client data
+                client = prescription.appointment_id.patient_social_security_ID
+
+                # Update billing address
+                client.client_billing_address = self.client_billing_address
+
+                # Create and update the transaction/payment history for the client
+                payment_history_dict = {
+                    "Prescription_id": prescription.prescription_id,
+                    "Transaction_id": self.payment_intent,
+                    "Amount": prescription.grand_total,
+                    "Payment_status": self.stripe_payment_status
+                }
+
+                client.transactions_made.append(payment_history_dict)
+                client.total_billings += prescription.grand_total
+                client.save()
+
+        except Prescription.DoesNotExist:
+            return "Prescription does not exist!"
+    
+        super().save(*args, **kwargs)
+        
+
     def __str__(self):
         return f"PaymentData for Prescription ID {self.prescription_id}"
+    
 
+# # Customer Post payment service feedback model
+# class ClientServiceFeedback(models.Model):
+#     RATING_CHOICES = (
+#         (1, '1 Star'),
+#         (2, '2 Stars'),
+#         (3, '3 Stars'),
+#         (4, '4 Stars'),
+#         (5, '5 Stars'),
+#     )
+#     appointment_id = models.ForeignKey(PatientAppointment, on_delete=models.SET_NULL, null=True,)
+#     overall_treatment_rating = models.PositiveIntegerField(choices=RATING_CHOICES, default=3, null=True, blank=True)
+#     doctors_support_rating = models.PositiveIntegerField(choices=RATING_CHOICES, default=3, null=True, blank=True)
+#     comment = models.TextField(blank=True, null=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
 
-
-
+#     def __str__(self):
+#         return f'{self.rating} - {self.comment[:20]}'
+    
+    
     
