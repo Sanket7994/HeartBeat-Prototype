@@ -9,8 +9,7 @@ from .models import (
     PatientAppointment,
     Prescription,
     PharmacyInventory,
-    ClientPaymentData,
-    # ClientServiceFeedback,
+    ClientServiceFeedback,
 )
 
 # To convert the Model object to an API-appropriate format like JSON,
@@ -157,7 +156,9 @@ class PrescriptionSerializer(serializers.ModelSerializer):
             "clinic_name",
             "consultant",
             "appointment_id",
+            "stripe_client_id",
             "medications_json",
+            "shipping_address",
             "stripe_appointment_service_id",
             "stripe_appointment_price_id",
             "appointment_fee",
@@ -171,23 +172,9 @@ class PrescriptionSerializer(serializers.ModelSerializer):
         )
 
 
-
-# Payment serialization
-class ClientPaymentDataSerializer(serializers.ModelSerializer):
+# Star Rating feedback     
+class ClientServiceFeedbackSerializer(serializers.ModelSerializer):
+    created_at = serializers.ReadOnlyField()
     class Meta:
-        model = ClientPaymentData
-        fields = ['prescription_id', 'session_id', 'payment_intent', 'payment_method',
-                  'client_billing_address', 'stripe_session_status', 'stripe_payment_status',
-                  'session_created_on', 'session_expired_on']
-        
-    def update(self, instance, validated_data):
-        if self.context['request'].method == 'PUT':
-            raise serializers.ValidationError("Updating existing instances is not allowed.")
-        return super().update(instance, validated_data)
-    
-    
-# # Star Rating feedback     
-# class ClientServiceFeedbackSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = ClientServiceFeedback
-#         fields = ['customer_id', 'rating', 'comment', 'created_at']
+        model = ClientServiceFeedback
+        fields = ['customer_id', 'overall_rating', 'comment', 'created_at']

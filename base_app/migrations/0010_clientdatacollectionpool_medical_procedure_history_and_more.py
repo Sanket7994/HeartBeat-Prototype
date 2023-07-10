@@ -91,7 +91,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='prescription',
             name='medications_json',
-            field=models.JSONField(blank=True, default=base_app.models.Prescription.default_medications, null=True),
+            field=models.JSONField(blank=True, default=base_app.models.Prescription.default_json_fields(), null=True),
         ),
         migrations.DeleteModel(
             name='PrescribedMedicationModel',

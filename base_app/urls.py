@@ -1,13 +1,14 @@
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
+from . import helper_functions
 from .views import MyTokenObtainPairView, LogoutView
 from .views import ClinicListView, StaffRelationshipManagementView
 from .views import AppointmentManagement, PharmacyInventoryManagement, PrescriptionManagement
 from .views import PingTest, LoginView, SignupView, ForgotPasswordView
 from .views import ResendOTP, ResetPasswordView, UserRetrieveUpdateAPIView, VerifyOTPView
 from .views import FetchPrescriptReceipt, PrescriptionPaymentCheckoutSessionView, CancelPaymentView, SuccessPaymentView
-from .views import ClientDataManagement
+from .views import ClientDataManagement, CustomerFeedbackView
 
 
 
@@ -46,11 +47,15 @@ urlpatterns = [
     
     path('clinic/scheduler/appointments/prescription/create/', PrescriptionManagement.as_view(), name='create-prescription'),
     path('clinic/scheduler/appointments/prescription/view/', PrescriptionManagement.as_view(), name='view-prescription'),
-    path('prescription/fetch/appointment_id=<str:appointment_id>&prescription_id=<str:prescription_id>', FetchPrescriptReceipt.as_view(), name='upload-prescription'),
     
-    path('config/', views.stripe_config),
+    path('prescription/fetch/appointment_id=<str:appointment_id>&prescription_id=<str:prescription_id>', FetchPrescriptReceipt.as_view(), name='upload-prescription'),
+    path('finance/change-currency/current_selected_currency=<str:current_selected_currency>&target_currency=<str:target_currency>', helper_functions.get_currency_exchange_rates),
+    path('finance/view-customer-feedback/', CustomerFeedbackView.as_view(), name='view-customer-feedback'),
+    
+    path('config/', views.stripe_config, name='share-key'),
     path('payment/create-checkout-session/<str:prescription_id>/', PrescriptionPaymentCheckoutSessionView.as_view(), name='create-checkout-session'),
     path('payment/success', SuccessPaymentView.as_view(), name='success-payment-view'),
+    path('payment/success/get-customer-feedback/', CustomerFeedbackView.as_view(), name='customer-feedback'),
     path('payment/cancel', CancelPaymentView.as_view(), name='cancel-payment-view'),    
     
     path('pharmacy/inventory/add/', PharmacyInventoryManagement.as_view(), name='new-drug'),

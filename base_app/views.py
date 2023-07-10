@@ -11,7 +11,8 @@ from .models import (
     ClientDataCollectionPool,
     PharmacyInventory,
     Prescription,
-    ClientPaymentData,
+    ClientServiceFeedback,
+    validate_address,
 )
 from .serializer import (
     ClinicSerializer,
@@ -22,7 +23,7 @@ from .serializer import (
     ClientDataCollectionPoolSerializer,
     PharmacyInventorySerializer,
     PrescriptionSerializer,
-    ClientPaymentDataSerializer,
+    ClientServiceFeedbackSerializer,
 )
 from .emails import (
     send_email_notification,
@@ -33,10 +34,16 @@ from .emails import (
     send_email_notification_to_staff,
     send_pay_link_via_email,
 )
-from .filter import clean_data
-from .sms import send_sms_notification_patient, send_sms_notification_staff_member
-from .otp_maker import generate_time_based_otp, is_otp_valid
-from .helper_functions import (fetch_master_data, create_payment_link, DecimalEncoder)
+from .sms import (send_sms_notification_patient, 
+                  send_sms_notification_staff_member)
+from .otp_maker import (generate_time_based_otp, 
+                        is_otp_valid)
+from .helper_functions import (fetch_master_data,
+                               clean_payment_data, 
+                               get_or_create_stripe_customer,
+                               create_payment_link, 
+                               DecimalEncoder, 
+                               send_stripe_invoice)
 from .serializer import (
     ForgotPasswordSerializer,
     ResetPasswordSerializer,
@@ -77,6 +84,7 @@ from collections import defaultdict, Counter
 from django.dispatch import Signal
 from django.db.models import F
 from django.views import View
+from django.db import transaction
 from django.shortcuts import render
 from django.conf import settings
 from django.http import JsonResponse
@@ -950,6 +958,7 @@ class ClientDataManagement(APIView):
                 "client_dob": self.request.GET.get("client_dob"),
                 "client_gender": self.request.GET.get("client_gender"),
                 "client_email": self.request.GET.get("client_email"),
+                "client_shipping_address": self.request.GET.get("client_shipping_address"),
                 "client_billing_address": self.request.GET.get("client_billing_address"),
                 "appointment_count": self.request.GET.get("appointment_count"),
                 "medical_procedure_history": self.request.GET.get("medical_procedure_history"),
@@ -997,6 +1006,9 @@ class ClientDataManagement(APIView):
                 for key in individual_procedures:
                     key_counts[key] += 1
             medProceduresCount = Counter(dict(key_counts))
+            
+            # Getting total due amount
+            total_due_amount = Prescription.get_total_due_amount()
 
             # Total prescription and appointments created for patients
             prescriptionCount = sum(int(prescription["prescription_count"]) for prescription in payload["Result"])
@@ -1009,6 +1021,7 @@ class ClientDataManagement(APIView):
                 "total_medical_procedure_count": medProceduresCount,
                 "total_prescriptions_created": prescriptionCount,
                 "total_appointment_handled": appointmentCount,
+                "total_due_amount": Decimal(total_due_amount - totalBilling).quantize(Decimal('0.00')),
                 "total_revenue_generated": totalBilling,
                 "average_patient_treatment_cost": averageBilling
             }
@@ -1115,7 +1128,6 @@ class PharmacyInventoryManagement(APIView):
 ############################################################################################################################
 
 # Prescription Creation View
-
 class PrescriptionManagement(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -1126,10 +1138,10 @@ class PrescriptionManagement(APIView):
             "consultant": request.data.get("consultant"),
             "appointment_id": request.data.get("appointment_id"),
             "medications_json": request.data.get("medications_json"),
+            "shipping_address": request.data.get("shipping_address"),
             "coupon_discount": request.data.get("coupon_discount"),
             "description": request.data.get("description")}
         
-        print(type(data['medications_json']))
         updated_medications_json = []
         try:
             log.debug("Medications data fetching")
@@ -1144,12 +1156,12 @@ class PrescriptionManagement(APIView):
                     "purpose": verified_data.drug_class,
                     "quantity": quantity,
                     "amount_per_unit": verified_data.price,
-                    "total_payable_amount": Decimal(int(verified_data.price) * int(quantity)),
+                    "total_payable_amount": Decimal(float(verified_data) * float(quantity)).quantize(Decimal('0.00')),
                     "stripe_price_id": verified_data.stripe_price_id,
                     "dosage_freq": dosage_freq
                 }
                 updated_medications_json.append(medication)
-
+                
         except PharmacyInventory.DoesNotExist as p:
             log.warning("Invalid Drug ID provided")
             return Response({"error": "PharmacyInventory with drug_id {} does not exist.".format(drug_id)}, 
@@ -1160,7 +1172,11 @@ class PrescriptionManagement(APIView):
         
         # Converting nested list to valid json format
         data["medications_json"] = json.dumps(updated_medications_json, cls=DecimalEncoder)
-
+        
+        # validate shipping address
+        verified_address = validate_address(data["shipping_address"])
+        data["shipping_address"] = json.dumps(verified_address)
+  
         # Finally validating through serializer
         serializer = PrescriptionSerializer(data=data)
         if serializer.is_valid():
@@ -1182,6 +1198,7 @@ class PrescriptionManagement(APIView):
                 "clinic_name": self.request.GET.get("clinic_name"),
                 "consultant": self.request.GET.get("consultant"),
                 "appointment_id": self.request.GET.get("appointment_id"),
+                "stripe_client_id": self.request.GET.get("stripe_client_id"),
                 "medications": self.request.GET.get("medication"),
                 "payment_status": self.request.GET.get("payment_status"),
                 "created_at": self.request.GET.get("created_at"),
@@ -1225,7 +1242,6 @@ class PrescriptionManagement(APIView):
 
 # View request to retrieve and share prescription related data
 # to frontend to generate Prescription Report
-
 class FetchPrescriptReceipt(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -1256,58 +1272,68 @@ class FetchPrescriptReceipt(APIView):
             return HttpResponse(f"Error occurred: {str(e)}", status=500)
 
 
+
 # Injecting Stripe secrete details to frontend
 @csrf_exempt
 def stripe_config(request):
     if request.method == 'GET':
-        stripe_config = {'publicKey': settings.STRIPE_PUBLIC_KEY}
-        log.warning("Stripe Public Key triggered in frontend")
+        stripe_config = {'secret_key': settings.STRIPE_SECRET_KEY}
+        log.warning("Stripe secret key triggered in frontend")
         return JsonResponse(stripe_config, safe=False)
 
 
 # Stripe Payment API
 class PrescriptionPaymentCheckoutSessionView(APIView):
     permission_classes = [permissions.AllowAny]
-    
-    def get(self, request, prescription_id, *args, **kwargs):
+
+    def post(self, request, prescription_id, *args, **kwargs):
+        stripe.api_key = settings.STRIPE_SECRET_KEY
         try:
-            stripe.api_key = settings.STRIPE_SECRET_KEY
-            # Fetching the data related to the unique prescription_id
+            # Fetch the data related to the unique prescription_id
             prescription_dict = fetch_master_data(appointment_id=None, prescription_id=prescription_id)
             log.info("Custom Data with PID %s generated", prescription_id)
 
-            # Generating the line items for the checkout session
+            # Generate the line items for the checkout session
             items = create_payment_link(prescription_dict, return_items="line_items")
             log.info("Line items gathered")
-            
-            # Creating a checkout session with Stripe
+
+            # Create or retrieve the Stripe customer
+            customer_id = get_or_create_stripe_customer(prescription_dict)
+
+            # Create a checkout session with Stripe
             checkout_session = stripe.checkout.Session.create(
                 success_url=settings.YOUR_DOMAIN + "/payment/success?session_id={CHECKOUT_SESSION_ID}",
                 cancel_url=settings.YOUR_DOMAIN + "/payment/cancel",
+                customer=customer_id,
                 payment_method_types=["card"],
                 mode="payment",
                 line_items=items,
                 client_reference_id=prescription_id,
-                billing_address_collection = "required")
+                billing_address_collection="required")
             
             log.info("Checkout session created successfully")
-            # Generating the payment link from stripe
+            # Generate the payment link from Stripe
             payment_url = checkout_session.url
 
+            # PayLink sanity Check
             if payment_url is None:
-                log.critical("Failed to create payment link")
-                # Handle the error condition, such as returning an error response
+                log.critical("Failed to create a payment link")
                 return Response(
-                    data={"error": "Failed to create payment link"}, status=status.HTTP_400_BAD_REQUEST,)
-                            
-            # Sending the payment link to client via email
+                    data={"error": "Failed to create a payment link"}, status=status.HTTP_400_BAD_REQUEST,)
+
+            # Send the payment link to the client via email
             send_pay_link_via_email(prescription_dict, payment_url)
-            log.info("Payment link shared to client via email")
-        
-            return JsonResponse({"sessionId": checkout_session.id})
+            log.info("Payment link shared with the client via email")
+
+            return Response({"sessionId": checkout_session.id})
+        #error handling
+        except stripe.error.StripeError as e:
+            log.error(str(e))
+            return Response(data={"Stripe error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             log.error(str(e))
-            return Response(data={"Internal error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={"Internal error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 # Success View
@@ -1315,65 +1341,159 @@ class SuccessPaymentView(View):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, *args, **kwargs):
+        stripe.api_key = settings.STRIPE_SECRET_KEY
         session_id = request.GET.get('session_id')
-        log.debug("Payment Session initiated")
+
         try:
-            stripe.api_key = settings.STRIPE_SECRET_KEY
             session_data = stripe.checkout.Session.retrieve(session_id)
+            log.info("Session Data retrieved")
+            # Cleaning data
+            cleaned_session_data = clean_payment_data(session_data)
+            cleaned_data = {
+                'prescription_id': cleaned_session_data["client_reference_id"],
+                'session_id': cleaned_session_data["id"],
+                'payment_intent': cleaned_session_data["payment_intent"],
+                'payment_method': cleaned_session_data["payment_method_types"][0],
+                'client_billing_address': json.loads(json.dumps(cleaned_session_data["customer_details"]["address"])),
+                'stripe_session_status': cleaned_session_data["status"],
+                'stripe_payment_status': cleaned_session_data["payment_status"],
+                'session_created_on': datetime.datetime.fromtimestamp(cleaned_session_data["created"]).strftime("%d-%m-%Y %H:%M:%S"),
+                'session_expired_on': datetime.datetime.fromtimestamp(cleaned_session_data["expires_at"]).strftime("%d-%m-%Y %H:%M:%S"),
+            }
 
-            # Cleaning the fetched session data
-            cleaned_data = clean_data(session_data)
+            with transaction.atomic():
+                prescription_id = cleaned_data["prescription_id"]
+                try:
+                    prescription = Prescription.objects.get(prescription_id=prescription_id)
+                except Prescription.DoesNotExist:
+                    return JsonResponse({'error': f"Prescription with ID {prescription_id} does not exist!"}, status=status.HTTP_400_BAD_REQUEST)
+
+                try:
+                    # Update billing address and customer ID in the related client object
+                    client = ClientDataCollectionPool.objects.get(stripe_customer_id=cleaned_session_data["customer"])
+                    client.client_billing_address = cleaned_data["client_billing_address"]
+                    client.transactions_made.append(cleaned_data)
+                    client.total_billings = Decimal(float(client.total_billings) + float(prescription.grand_total)
+                                                    ).quantize(Decimal('0.00'))
+                    client.save()
+
+                    # Save the payment data
+                    serializer = ClientDataCollectionPoolSerializer(client, data=cleaned_data, partial=True)
+                    if serializer.is_valid():
+                        serializer.save()
+                        log.info("Payment data saved for client %s", session_data["customer"])
+                        
+                except ClientDataCollectionPool.DoesNotExist:
+                    log.critical("client data for CID %s not found", session_data["customer"])
+                    return JsonResponse({'error': "Customer not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+                # Update payment status in the related prescription
+                prescription_data = {"payment_status": cleaned_data["stripe_payment_status"].upper()}
+                prescription_serializer = PrescriptionSerializer(prescription, data=prescription_data, partial=True)
+                if prescription_serializer.is_valid():
+                    prescription_serializer.save()
+                    log.info("Payment status updated for PID: %s", prescription_id)
+
+            # Render success payment page with Customer Satisfaction Feedback form
             context = {'retrieve_session_data': cleaned_data}
-
             html_content = render_to_string('Success.html', context)
-
-            # getting prescription id
-            prescription_id = str(cleaned_data["client_reference_id"])
-
-            # Updating payment data in ClientPaymentData Model
-            payment_data = {
-                'prescription_id': prescription_id,
-                'session_id': cleaned_data["id"],
-                'payment_intent': cleaned_data["payment_intent"],
-                'payment_method': cleaned_data["payment_method_types"][0],
-                'client_billing_address': cleaned_data["billing_address_collection"],
-                'stripe_session_status': cleaned_data["status"],
-                'stripe_payment_status': cleaned_data["payment_status"],
-                'session_created_on': datetime.datetime.fromtimestamp(cleaned_data["created"]).strftime("%d-%m-%Y %H:%M:%S"),
-                'session_expired_on': datetime.datetime.fromtimestamp(cleaned_data["expires_at"]).strftime("%d-%m-%Y %H:%M:%S"),}
-
-            serializer = ClientPaymentDataSerializer(data=payment_data)
-            if serializer.is_valid():
-                serializer.save()
-                log.info("Payment data saved")
-
-            # Updating the payment status in prescription model
-            related_prescription = Prescription.objects.get(prescription_id=prescription_id)
-            prescription_data = {"payment_status": str(cleaned_data["payment_status"]).upper(),}
-            
-            serializer = PrescriptionSerializer(related_prescription, data=prescription_data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                log.info("Prescription data saved")
-                
-            # When Payment has been successful send client a email notification for successful payment
-            # and Product allotment
-            
-            
-            
-            log.info("Payment was successful, Session expired now")
+            log.info("Success payment page rendered")
             return HttpResponse(html_content, status=status.HTTP_200_OK)
+        #Error handling
         except stripe.error.StripeError as e:
             error_message = "A payment error occurred: {}".format(e.user_message)
-            log.critical(error_message)
+            log.critical(f'error : {str(error_message)}')
             return JsonResponse({'error': error_message}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            log.critical(str(e))
+            log.error(f'error : {str(e)}')
             return JsonResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+
+# Post payment Customer Feedback redirect View
+class CustomerFeedbackView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    # Create feedback
+    def post(self, request, *args, **kwargs):
+        try:
+            data = {
+                "session_id": request.data.get("session_id"),
+                "overall_rating": request.data.get("overall_rating"),
+                "comment": request.data.get("comment"),}
+            
+            if data["session_id"] is not None:
+                session_data = stripe.checkout.Session.retrieve(data["session_id"])
+                
+                # adding customer id to data 
+                data["customer_id"] = str(session_data["customer"])
+                # Deleting session Id as its not necessary
+                del data['session_id']
+                
+                serializer = ClientServiceFeedbackSerializer(data=data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                log.info("CID %s has submitted his feedback successfully", data["customer_id"])
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            log.warning("Unable to retrieve Session ID")
+            raise ValueError("Session ID is not available")
         
+        except stripe.error.StripeError as e:
+            error_message = str(e.user_message) if hasattr(e, "user_message") else str(e)
+            log.error("Error from stripe API: %s", error_message)
+            return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            log.error("error: %s", str(e))
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # View customer feedback
+    def get(self, request, *args, **kwargs):
+        try:
+            queryset = ClientServiceFeedback.objects.all().order_by("-created_at")
+            filter_params = {
+                "customer_id": self.request.GET.get("customer_id"),
+                "overall_rating": self.request.GET.get("overall_rating"),
+                "comment": self.request.GET.get("comment"),
+            }
+        
+            # Parsing key and value into conditional filter
+            filters = {
+                field: value for field, value in filter_params.items() if value is not None}
+
+            if filters:
+                queryset = queryset.filter(**filters)
+
+            # Applying pagination
+            set_limit = self.request.GET.get("limit")
+            paginator = Paginator(queryset, set_limit)
+            page_number = self.request.GET.get("page")
+            # Use GET instead of data to retrieve the page number
+            page_obj = paginator.get_page(page_number)
+            serializer = ClientServiceFeedbackSerializer(page_obj, many=True)
+
+            # result dictionary
+            payload = {
+                "Page": {
+                    "totalRecords": queryset.count(),
+                    "current": page_obj.number,
+                    "next": page_obj.has_next(),
+                    "previous": page_obj.has_previous(),
+                    "totalPages": page_obj.paginator.num_pages,
+                },
+                "Result": serializer.data,
+            }
+            log.info("Feedback data generated")
+            return Response(payload, status=status.HTTP_200_OK,)
+
+        except Exception as e:
+            log.error(str(e))
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+
 # Cancel Response View
 class CancelPaymentView(View):
     def get(self, request):
+        stripe.api_key = settings.STRIPE_SECRET_KEY
         html_content = render_to_string('Cancel.html')
         return HttpResponse(html_content)
