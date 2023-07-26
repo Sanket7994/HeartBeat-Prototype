@@ -2,18 +2,19 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from . import helper_functions
-from .views import MyTokenObtainPairView, LogoutView
+from .views import MyTokenObtainPairView, TokenRefreshView, LogoutView
 from .views import ClinicListView, StaffRelationshipManagementView
 from .views import AppointmentManagement, PharmacyInventoryManagement, PrescriptionManagement
 from .views import PingTest, LoginView, SignupView, ForgotPasswordView
 from .views import ResendOTP, ResetPasswordView, UserRetrieveUpdateAPIView, VerifyOTPView
 from .views import FetchPrescriptReceipt, PrescriptionPaymentCheckoutSessionView, CancelPaymentView, SuccessPaymentView
-from .views import ClientDataManagement, CustomerFeedbackView
-
+from .views import ClientDataManagement, CustomerFeedbackView, SendBatchPurchaseRequest, ThreadManagementView
+from .views import DownloadPOInvoices, TaskManager
 
 
 urlpatterns = [
     path('ping/', PingTest.as_view(), name='check-ping'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='auto-refresh-acc-token'),
     
     path('login/', LoginView.as_view(), name='login'),
     path('signup/', SignupView.as_view(), name='signup'),
@@ -23,11 +24,11 @@ urlpatterns = [
     path('clinic/login/', LoginView.as_view(), name='login-clinic'),
     
     path('forgot-password/' , ForgotPasswordView.as_view(), name="forget-password"),
-    path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
+    path('reset-password', ResetPasswordView.as_view(), name='reset-password'),
     
-    path('profile/<str:id>/', UserRetrieveUpdateAPIView.as_view(), name='view'),
-    path('profile/<str:id>/update/', UserRetrieveUpdateAPIView.as_view(), name='update'),
-    path('profile/<str:id>/delete/', UserRetrieveUpdateAPIView.as_view(), name='delete'),
+    path('profile/id=<str:id>', UserRetrieveUpdateAPIView.as_view(), name='view'),
+    path('profile/<str:id>/update', UserRetrieveUpdateAPIView.as_view(), name='update'),
+    path('profile/<str:id>/delete', UserRetrieveUpdateAPIView.as_view(), name='delete'),
     
     path('clinic/add/', ClinicListView.as_view(), name="add-clinic"),
     path('clinic/list/', ClinicListView.as_view(), name="view-clinic"),
@@ -35,6 +36,10 @@ urlpatterns = [
     
     path('clinic/allusers/', StaffRelationshipManagementView.as_view(), name='srm'),
     path('clinic/allusers/add/', StaffRelationshipManagementView.as_view(), name='srm-add'),
+    
+    path('task-manager/create/', TaskManager.as_view(), name='create-assignment'),
+    path('task-manager/view/<str:staff_id>/<str:task_id>', TaskManager.as_view(), name='view-assignment'),
+    path('task-manager/update/<str:task_id>', TaskManager.as_view(), name='update-assignment'),
     
     path('clinic/scheduler/appointments/availability/', AppointmentManagement.as_view(), name='check-availability'),
     
@@ -59,7 +64,15 @@ urlpatterns = [
     path('payment/cancel', CancelPaymentView.as_view(), name='cancel-payment-view'),    
     
     path('pharmacy/inventory/add/', PharmacyInventoryManagement.as_view(), name='new-drug'),
-    path('pharmacy/inventory/list/', PharmacyInventoryManagement.as_view(), name='view-drug-list'),
+    path('pharmacy/inventory/list/drug_id=<str:drug_id>', PharmacyInventoryManagement.as_view(), name='view-drug-list'),
+    path('pharmacy/inventory/drug_id=<str:drug_id>', PharmacyInventoryManagement.as_view(), name='view-selected-drug'),
+    path('pharmacy/inventory/send-request/', SendBatchPurchaseRequest.as_view(), name='purchase-request'),
+    
+    path('pharmacy/purchase-order/purchase_order_id=<str:purchase_order_id>', SendBatchPurchaseRequest.as_view(), name='view-purchase-request'),
+    path('pharmacy/purchase-order/edit/purchase_order_id=<str:purchase_order_id>', SendBatchPurchaseRequest.as_view(), name='update-purchase-request'),
+    path('pharmacy/purchase-order/update-thread/purchase_order_id=<str:purchase_order_id>', ThreadManagementView.as_view(), name='update-thread'),
+    path('pharmacy/purchase-order/del/purchase_order_id=<str:purchase_order_id>', SendBatchPurchaseRequest.as_view(), name='delete-purchase-request'),
+    path('pharmacy/download-PO-invoice/purchase_order_id=<str:purchase_order_id>', DownloadPOInvoices.as_view(), name='download-purchase-request'),
     
     path('api/token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

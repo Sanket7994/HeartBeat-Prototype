@@ -21,6 +21,7 @@ from django.core.validators import RegexValidator
 from django.utils.translation import gettext_lazy as _
 from phonenumber_field.modelfields import PhoneNumberField
 from django_resized import ResizedImageField
+from django.core.validators import URLValidator
 from django.utils.deconstruct import deconstructible
 
 
@@ -53,8 +54,8 @@ class CustomUserManager(BaseUserManager):
 # For Backend Admins
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     class Roles(models.TextChoices):
-        OPERATOR = ("OPERATOR", "Operator")
         CLINIC_MANAGEMENT = ("CLINIC_MANAGEMENT", "Clinic Management")
+        SUPER_ADMIN = ("SUPER_ADMIN", "SuperAdmin")
 
     select_role = models.CharField(
         max_length=100, choices=Roles.choices, default=None, null=True
@@ -76,8 +77,8 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_admin = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
-    is_operator = models.BooleanField(default=False)
     is_clinic_management = models.BooleanField(default=False)
+    is_super_admin = models.BooleanField(default=False)
     username = None
 
     USERNAME_FIELD = "email"
@@ -94,8 +95,8 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
                 # Give Unique ID as per designation of the user
                 if self.is_admin:
                     new_id = str("BA-" + str(uuid.uuid4().hex[:10].upper()))
-                elif self.is_operator:
-                    new_id = str("OP-" + str(uuid.uuid4().hex[:10].upper()))
+                elif self.is_super_admin:
+                    new_id = str("SA-" + str(uuid.uuid4().hex[:10].upper()))
                 elif self.is_clinic_management:
                     new_id = str("CM-" + str(uuid.uuid4().hex[:10].upper()))
                 # If user doesn`t exit in database give him a new id
@@ -227,12 +228,8 @@ class ClinicMember(models.Model):
         blank=True,
         null=True,
     )
-    staff_designation = models.CharField(
-        max_length=100, choices=StaffDesignation.choices, default=None, null=True
-    )
-    shift_type = models.CharField(
-        max_length=100, choices=Shift_type.choices, default=Shift_type.GENERAL_SHIFT
-    )
+    staff_designation = models.CharField(max_length=100, choices=StaffDesignation.choices, default=None, null=True)
+    shift_type = models.CharField(max_length=100, choices=Shift_type.choices, default=Shift_type.GENERAL_SHIFT)
     staff_email = models.EmailField(blank=True, null=True)
     staff_contact_number = PhoneNumberField(
         default=None,
@@ -240,9 +237,7 @@ class ClinicMember(models.Model):
         blank=True,
         validators=[RegexValidator(r"^(\+\d{1,3})?,?\s?\d{8,15}")],
     )
-    staff_status = models.CharField(
-        max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
-    )
+    staff_status = models.CharField(max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING)
     last_updated = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
@@ -257,6 +252,59 @@ class ClinicMember(models.Model):
                     self.staff_id = new_staff_id
                     break
         super().save(*args, **kwargs)
+
+
+# User Todo List
+class TaskAssignmentManager(models.Model):
+    
+    def default_json():
+        return {}
+    
+    class StatusCode(models.TextChoices):
+        COMPLETED = ("COMPLETED", "Completed")
+        PENDING = ("PENDING", "Pending")
+        POSTPONED = ("POSTPONED", "Postponed")
+        OVERDUE = ("OVERDUE", "Overdue")
+        
+    class SetPriority(models.TextChoices):
+        HIGH = ("HIGH", "High")
+        MID = ("MID", "Mid")
+        LOW = ("LOW", "Low")
+        
+    class TaskType(models.TextChoices):
+        GROUP = ("GROUP", "Group")
+        INDIVIDUAL = ("INDIVIDUAL", "Individual")
+
+    task_id = models.CharField(
+        primary_key=True,
+        max_length=50,
+        editable=False,
+        unique=True,
+    )
+    task_title = models.CharField(max_length=100, blank=True, null=True, default=None)
+    assignor =  models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True)
+    department = models.CharField(max_length=100, choices=ClinicMember.StaffDesignation.choices, default=None, null=True)
+    add_assignees = models.CharField(max_length=100, blank=True, null=True, default=None)
+    sub_tasks = models.JSONField(default=default_json, blank=True, null=True)
+    task_thread = models.JSONField(default=default_json, blank=True, null=True)
+    priority = models.CharField(max_length=100, choices=SetPriority.choices, default=SetPriority.LOW)
+    task_status = models.CharField(max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING)
+    set_deadline = models.DateField(default=None, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(auto_now=True)
+    
+    def save(self, *args, **kwargs):
+        if not self.task_id:
+            while True:
+                new_task_id = str(f"TSK-" + uuid.uuid4().hex[:10].upper())
+                if not TaskAssignmentManager.objects.filter(task_id=new_task_id).exists():
+                    self.task_id = new_task_id
+                    break
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.task_id
+    
 
 
 # Medical Procedures
@@ -358,6 +406,8 @@ class PatientAppointment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
     def save(self, *args, **kwargs):
+        count_dict = {}
+        
         if self.date_of_birth:
             today = date.today()
             patient_age = today.year - self.date_of_birth.year
@@ -383,9 +433,7 @@ class PatientAppointment(models.Model):
         super().save(*args, **kwargs)
 
         if self.procedures.exists():
-            count_dict = Counter(
-                item.procedure_choice for item in self.procedures.all()
-            )
+            count_dict = Counter(item.procedure_choice for item in self.procedures.all())
             return count_dict
 
         # Check if patient exists in ClientDataCollectionPool
@@ -393,8 +441,7 @@ class PatientAppointment(models.Model):
         try:
             with transaction.atomic():
                 client = ClientDataCollectionPool.objects.get(
-                    client_social_security_ID=self.patient_social_security_ID
-                )
+                    client_social_security_ID=self.patient_social_security_ID)
 
         except ClientDataCollectionPool.DoesNotExist:
             # Patient doesn't exist, create a new client
@@ -516,6 +563,9 @@ class ClientDataCollectionPool(models.Model):
 
 # Pharmacy Drug Inventory
 class PharmacyInventory(models.Model):
+    def default_stock_history():
+        return {"added_on": "", "quantity": "", "purchase_order_id": ""}
+    
     class DosageType(models.TextChoices):
         ORAL = "ORAL", "Oral"
         OPHTHALMIC = "OPHTHALMIC", "Ophthalmic"
@@ -559,6 +609,10 @@ class PharmacyInventory(models.Model):
             "OPHTHALMIC: Used for eye infections, dry eyes, allergic conjunctivitis",
             "OPHTHALMIC",
         )
+        TEST_KITS = (
+        "TEST KITS: Used as diagnostic tools to detect and analyze various medical conditions or substances.",
+        "TEST_KITS",
+        )
         OTHER = ("Other", "OTHER")
 
     class UnitType(models.TextChoices):
@@ -577,41 +631,34 @@ class PharmacyInventory(models.Model):
         max_length=255, blank=True, null=True, editable=False
     )
     drug_name = models.CharField(max_length=250, unique=True)
+    drug_image_url = models.TextField(validators=[URLValidator()], blank=True, null=True)
     drug_image = ResizedImageField(
         size=[150, 150],
         default="default_image.png",
         upload_to="Drug_Stock_Images",
         blank=True,
-        null=True,
-    )
+        null=True,)
     generic_name = models.CharField(max_length=250)
     brand_name = models.CharField(max_length=250)
     drug_class = models.CharField(
         choices=GeneralDrugClass.choices,
         default=GeneralDrugClass.OTHER,
-        max_length=250,
-    )
+        max_length=250,)
     dosage_form = models.CharField(
         choices=DosageType.choices,
         default=DosageType.OTHER,
-        max_length=250,
-    )
+        max_length=250,)
     unit_type = models.CharField(
         choices=UnitType.choices,
         default=UnitType.SINGLE_UNIT,
-        max_length=250,
-    )
+        max_length=250,)
     price = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     stripe_price_id = models.CharField(
         max_length=255, blank=True, null=True, editable=False
     )
     add_new_stock = models.PositiveIntegerField(default=0, help_text="add_quantity")
-    stock_available = models.PositiveIntegerField(
-        default=0, editable=False, help_text="available_stock"
-    )
-    stock_history = models.TextField(
-        default="[]", editable=False, help_text="stock history"
-    )
+    stock_available = models.PositiveIntegerField(default=0, help_text="available_stock")
+    stock_history = models.JSONField(default=default_stock_history, null=True, blank=True, help_text="stock history")
     manufacture_date = models.DateField(default=timezone.now)
     lifetime_in_months = models.PositiveIntegerField(
         default=0, help_text="number_of_months"
@@ -620,26 +667,9 @@ class PharmacyInventory(models.Model):
     added_at = models.DateTimeField(auto_now_add=True, editable=False)
 
     def save(self, *args, **kwargs):
-        # Update Stock If new quantity is added
-        if self.add_new_stock:
-            new_stock = int(self.stock_available) + int(self.add_new_stock)
-            self.stock_available = new_stock
-            # Store the new entry in stock_history
-            stock_history = json.loads(self.stock_history)
-            new_entry = {
-                "quantity": self.add_new_stock,
-                "date": f"{datetime.now():%d-%m-%Y %H:%M:%S}",
-            }
-            stock_history.append(new_entry)
-            self.stock_history = json.dumps(stock_history)
-            # Reset add_new_stock to default value
-            self.add_new_stock = 0
-
         # Add expiry date and
         if self.manufacture_date and self.lifetime_in_months:
-            expiry_date = self.manufacture_date + timedelta(
-                days=30 * self.lifetime_in_months
-            )
+            expiry_date = self.manufacture_date + timedelta(days=30 * self.lifetime_in_months)
             self.expiry_date = expiry_date
 
         # Generate ID
@@ -669,6 +699,43 @@ class PharmacyInventory(models.Model):
 
     def __str__(self):
         return self.drug_name
+
+
+# Purchase order for drugs
+class PurchaseOrder(models.Model):
+    def default_file_structure():
+        return {"drugURL": "", "drugId": "", "drugName": "", "pricePerUnit": "", "quantity": ""}
+    
+    def default_thread():
+        return {}
+
+    class StatusCode(models.TextChoices):
+        APPROVED = "APPROVED", "Approved"
+        PENDING = "PENDING", "Pending"
+        REJECTED = "REJECTED", "Rejected"
+    
+    purchase_order_id = models.CharField(primary_key=True, max_length=20, editable=False, unique=True,)
+    order = models.JSONField(default=default_file_structure, blank=True, null=True)
+    total_payment_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    PO_report = models.FileField(upload_to='CSV_records', blank=True, null=True, default=None)
+    created_by = models.CharField(max_length=250, default=None, null=True, blank=True)
+    authorized_by = models.CharField(max_length=250, default=None, null=True, blank=True)
+    thread_history= models.JSONField(default=default_thread, null=True, blank=True)
+    status = models.CharField(max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING)
+    request_sent_at = models.DateTimeField(auto_now_add=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def save(self, *args, **kwargs):
+        if not self.purchase_order_id:
+            while True:
+                new_purchase_order_id = str(f"PO-" + uuid.uuid4().hex[:10].upper())
+                if not PurchaseOrder.objects.filter(purchase_order_id=new_purchase_order_id).exists():
+                    self.purchase_order_id = new_purchase_order_id
+                    break
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.purchase_order_id
 
 
 # Prescription Model
@@ -817,10 +884,9 @@ class Prescription(models.Model):
     def get_total_due_amount(cls):
         total_due = Prescription.objects.aggregate(total=Sum('grand_total'))
         return round(total_due['total'], 2) if total_due['total'] else 0.00
-
+    
     def __str__(self):
         return str(self.prescription_id)
-
 
 
 # Customer Post payment service feedback model

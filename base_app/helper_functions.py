@@ -3,12 +3,17 @@ import logging
 log = logging.getLogger(__name__)
 
 # IMPORTS
+import os
+import csv
 import json
+from datetime import datetime
 import requests
 from django.http import JsonResponse
 from decimal import Decimal
 import stripe, logging
 from django.core.exceptions import ObjectDoesNotExist
+from datetime import timedelta
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from django.shortcuts import render
 from django.db.models import F
 from django.conf import settings
@@ -25,7 +30,55 @@ from .serializer import (
     PrescriptionSerializer,)
 
 
-# Decoder
+
+# Validation test for JWT authorization tokens
+def validate_token(token):
+    try:
+        # Attempt to decode the access token
+        access_token = AccessToken(token)
+        # Check if the access token is expired
+        is_access_token_expired = access_token.is_expired
+        # If you need to check the expiration time explicitly, you can access the "exp" claim
+        access_token_expiration_time = access_token.payload["exp"]
+        # Optionally, you can also check the refresh token's expiration status
+        refresh_token = RefreshToken(token)
+        is_refresh_token_expired = refresh_token.is_expired
+        # If you need to check the refresh token's expiration time explicitly
+        refresh_token_expiration_time = refresh_token.payload["exp"]
+        # Now, you can use the above variables to handle token expiration validation logic as needed
+        if is_access_token_expired:
+            print("Access token has expired.")
+        else:
+            print("Access token is still valid.")
+        if is_refresh_token_expired:
+            print("Refresh token has expired.")
+        else:
+            print("Refresh token is still valid.")
+    except Exception as e:
+        print(f"Token validation error: {str(e)}")
+
+
+# Create pagination
+def apply_pagination(self, request, Paginator, queryset, serializer, *args, **kwargs):
+    set_limit = self.request.GET.get("limit")
+    paginator = Paginator(queryset, set_limit)
+    page_number = self.request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+    meta_serializer = serializer(page_obj, many=True)
+
+    return {
+        "Page": {
+            "totalRecords": queryset.count(),
+            "current": page_obj.number,
+            "next": page_obj.has_next(),
+            "previous": page_obj.has_previous(),
+            "totalPages": page_obj.paginator.num_pages,
+        },
+        "Result": meta_serializer.data,
+    }
+    
+    
+# JSON Decoder for Decimal Digits
 class DecimalEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, Decimal):
@@ -33,7 +86,21 @@ class DecimalEncoder(json.JSONEncoder):
         return super().default(o)
 
 
+# JSON Datetime encoder
+class DatetimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            return super().default(obj)
+        except TypeError:
+            return str(obj)
 
+
+# Get difference between two or more Dates
+def days_diff(a, b):
+    return (datetime.strptime(a, "%d-%m-%Y %H:%M:%S") - datetime.strptime(b, "%d-%m-%Y %H:%M:%S")).days
+
+
+# Currency Exchange Rate API
 def get_currency_exchange_rates(request, current_selected_currency, target_currency):
     if current_selected_currency is not None and target_currency is not None:
         url = f'https://api.exchangerate.host/convert?from={current_selected_currency}&to={target_currency}'
@@ -42,6 +109,19 @@ def get_currency_exchange_rates(request, current_selected_currency, target_curre
         return JsonResponse(data)  # Return the data as a JSON response
     raise ValueError("This URL only supports non-null values.")
 
+
+# Convert Dictionary to CSV file
+def dict_to_csv(data, filename):
+    fieldnames = list(data[0].keys())
+    current_directory = os.getcwd()
+    filepath = os.path.join(current_directory, filename)
+
+    with open(filepath, 'w', newline='') as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(data)
+
+    return filepath
 
 
 # Can retrieve collected data from either appointment or prescription unique identifiers
@@ -309,7 +389,6 @@ def fetch_data_and_render_template(request, appointment_id, prescription_id):
         "../templates/prescription_invoice.html",
         {"data": data, "error_message": error_message},
     )
-
 
 
 

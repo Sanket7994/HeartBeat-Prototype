@@ -3,13 +3,17 @@ import logging
 log = logging.getLogger(__name__)
 
 # Within the project directory
+import os
 from .models import (
     CustomUser,
     Clinic,
     ClinicMember,
-    PatientAppointment,
+    TaskAssignmentManager,
+    PurchaseOrder,
     ClientDataCollectionPool,
     PharmacyInventory,
+    PatientAppointment,
+    PurchaseOrder,
     Prescription,
     ClientServiceFeedback,
     validate_address,
@@ -18,10 +22,12 @@ from .serializer import (
     ClinicSerializer,
     CustomSerializer,
     ClinicStaffSerializer,
+    TaskAssignmentManagerSerializer,
     MedicalProceduresTypes,
     AppointmentSerializer,
     ClientDataCollectionPoolSerializer,
     PharmacyInventorySerializer,
+    PurchaseOrderSerializer,
     PrescriptionSerializer,
     ClientServiceFeedbackSerializer,
 )
@@ -33,16 +39,22 @@ from .emails import (
     send_email_notification_to_patient,
     send_email_notification_to_staff,
     send_pay_link_via_email,
+    send_email_with_attachment,
 )
 from .sms import (send_sms_notification_patient, 
                   send_sms_notification_staff_member)
 from .otp_maker import (generate_time_based_otp, 
                         is_otp_valid)
-from .helper_functions import (fetch_master_data,
+from .helper_functions import (validate_token,
+                               apply_pagination,
+                               fetch_master_data,
+                               days_diff,
+                               dict_to_csv,
                                clean_payment_data, 
                                get_or_create_stripe_customer,
                                create_payment_link, 
                                DecimalEncoder, 
+                               DatetimeEncoder,
                                send_stripe_invoice)
 from .serializer import (
     ForgotPasswordSerializer,
@@ -58,6 +70,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.exceptions import ValidationError
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
@@ -69,7 +82,9 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 
 # External Django libraries and modules
+import csv
 import json
+import base64
 import requests
 import datetime
 import stripe
@@ -78,7 +93,13 @@ import platform
 # For executing a shell command
 import subprocess  
 from decimal import Decimal
+from django.db.models import Count, Sum
+from django.http import QueryDict
+from django.http import FileResponse
 from datetime import date
+from django.core.exceptions import ObjectDoesNotExist
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from datetime import timedelta
 from collections import defaultdict, Counter
 from django.dispatch import Signal
@@ -160,12 +181,12 @@ class SignupView(APIView):
                 )
 
             # User Role selection
-            if select_role == "OPERATOR":
-                is_operator = True
+            if select_role == "SUPER_ADMIN":
+                is_super_admin = True
                 is_clinic_management = False
                 is_active = False
             elif select_role == "CLINIC_MANAGEMENT":
-                is_operator = False
+                is_super_admin = False
                 is_clinic_management = True
                 is_active = False
             else:
@@ -176,7 +197,7 @@ class SignupView(APIView):
                 first_name=first_name,
                 last_name=last_name,
                 select_role=select_role,
-                is_operator=is_operator,
+                is_super_admin=is_super_admin,
                 is_clinic_management=is_clinic_management,
                 is_active=is_active,
             )
@@ -195,12 +216,9 @@ class SignupView(APIView):
             # Saving user information temporarily till they verify
             user.save()
             log.info("New user registered, Account activation pending.")
-            return Response(
-                data={
-                    "message": "Your account has been registered now. To activate it, Confirm OTP."
-                },
-                status=status.HTTP_200_OK,
-            )
+            return Response(data={
+                "message": "Your account has been registered now. To activate it, Confirm OTP."},
+                            status=status.HTTP_200_OK,)
         except Exception as e:
             log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -264,7 +282,6 @@ class VerifyOTPView(APIView):
                 },
                 status=status.HTTP_200_OK,
             )
-
         # Retrieve the email and OTP from the session or any other storage
         stored_email = request.session.get("email")
         stored_otp = request.session.get("otp")
@@ -277,18 +294,13 @@ class VerifyOTPView(APIView):
                     user.set_password(stored_password)
                     user.is_active = True
                     user.save()
-
                     # Clear the email and OTP from the session or any other storage
                     del request.session["email"]
                     del request.session["otp"]
-
                     log.info("Session data deleted and %s activated successfully", user.email)
                     return Response(
-                        data={
-                            "error_message": "Account verified successfully. You can now log in."
-                        },
-                        status=status.HTTP_200_OK,
-                    )
+                        data={"error_message": "Account verified successfully. You can now log in."},
+                        status=status.HTTP_200_OK,)
         except Exception as e:
             log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
@@ -373,20 +385,53 @@ class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
 
 
+# Auto refresh access tokens If user is logged in
+class TokenRefreshView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        # Check if the user is logged in
+        if user.is_authenticated:
+            access_token = request.auth
+            if access_token:
+                print(access_token.get('exp'))
+                # Get the remaining time until the access token expires
+                remaining_time = access_token.get('exp') - datetime.utcnow().timestamp()
+
+                # Set the threshold time for refreshing the token
+                refresh_threshold = 60 #1 minute
+
+                if remaining_time < refresh_threshold:
+                    # If the access token is about to expire, generate a new one
+                    refresh = RefreshToken(access_token)
+                    new_access_token = str(refresh.access_token)
+                    # Return the new access token in the response
+                    return Response({"access_token": new_access_token}, status=status.HTTP_200_OK)
+        # Return a 401 Unauthorized status if the user is not logged in or the token doesn't require refreshing
+        return Response({"detail": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+
 # User Account Logout API
+# Known Issue: 
+# So basically every time the server was reloading because the SECRET_KEY had a new value, 
+# the value of the SIGNING_KEY changed. Hence, the old refresh token became invalid, 
+# even when it did not expire, as its SIGNING_KEY value was not matching with current one.
 class LogoutView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         try:
-            refresh_token = request.data["refresh_token"]
-            token = RefreshToken(refresh_token)
-            token.blacklist()
+            refresh_token = request.data.get("refresh_token")
+            if not refresh_token:
+                raise ValueError("Refresh token not provided in the request data.")
+            if RefreshToken(refresh_token).is_expired:
+                RefreshToken(refresh_token).blacklist()
+                raise ValueError("Refresh token has expired.")
+            RefreshToken(refresh_token).blacklist()
             log.info("Token Blacklisted and User logged out.")
             return Response(
-                {"message": "Logged out successfully"},
-                status=status.HTTP_200_OK,
-            )
+                {"message": "Logged out successfully"}, status=status.HTTP_200_OK,)
         except Exception as e:
             log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -394,7 +439,7 @@ class LogoutView(APIView):
 
 # User Account Forgot Password API
 class ForgotPasswordView(APIView):
-    permission_classes = [permissions.IsAuthenticated,]
+    permission_classes = [permissions.AllowAny,]
 
     def post(self, request, *args, **kwargs):
         serializer = ForgotPasswordSerializer(data=request.data)
@@ -402,8 +447,8 @@ class ForgotPasswordView(APIView):
             if serializer.is_valid():
                 email = serializer.validated_data["email"]
                 try:
-                    user = CustomUser.objects.get(email=email)
-
+                    user = CustomUser.objects.filter(email=email).first() 
+                    
                 except CustomUser.DoesNotExist:
                     log.error("User does not exist")
                     return Response(
@@ -411,6 +456,7 @@ class ForgotPasswordView(APIView):
                         status=status.HTTP_404_NOT_FOUND,)
 
                 uid = urlsafe_base64_encode(force_bytes(str(user.pk)))
+                print(str(user.pk))
                 token = default_token_generator.make_token(user)
 
                 # Calling custom email generator
@@ -429,14 +475,19 @@ class ForgotPasswordView(APIView):
 
 # User Account Reset Password API
 class ResetPasswordView(APIView):
-    permission_classes = [permissions.IsAuthenticated,]
+    permission_classes = [permissions.AllowAny,]
 
     def post(self, request, *args, **kwargs):
         try:
             token = request.query_params.get("token")
             uidb64 = request.query_params.get("uid")
 
-            uid = urlsafe_base64_decode(uidb64)
+            # Add padding characters to uidb64
+            padding = len(uidb64) % 4
+            if padding:
+                uidb64 += "=" * (4 - padding)
+
+            uid = base64.urlsafe_b64decode(uidb64).decode('utf-8')
             user = CustomUser.objects.get(pk=uid)
 
         except (TypeError, ValueError, OverflowError, ObjectDoesNotExist) as e:
@@ -469,7 +520,7 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
     # View user data
     def get(self, request, id, *args, **kwargs):
         try:
-            user_profile = CustomUser.objects.get(user__id=id)
+            user_profile = CustomUser.objects.get(id=id)
         except CustomUser.DoesNotExist:
             log.warning("User with id %s does not exist", id)
             return Response(
@@ -530,7 +581,6 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
 
 
 ############################################################################################################################
-
 
 # CRUD OPERATION FOR CLINIC
 class ClinicListView(APIView):
@@ -626,7 +676,6 @@ class ClinicListView(APIView):
 
 
 ############################################################################################################################
-
 
 # CRUD FOR CLINIC STAFF
 class StaffRelationshipManagementView(APIView):
@@ -782,6 +831,138 @@ class StaffRelationshipManagementView(APIView):
 
 ############################################################################################################################
 
+# To-do list or a Task Assigner for Clinic Members
+
+class TaskManager(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    # CREATE ASSIGNMENT
+    def post(self, request, *args, **kwargs):
+        assignor_value = request.data.get("assignor")
+        if assignor_value and assignor_value.startswith("SA-"):
+            try:
+                # Making task structure
+                sub_tasks = []
+                for task in request.data.get("sub_tasks"):
+                    sub_tasks.append({"task": task, "completion_timestamp": "", "status": "Pending"})
+                    
+                task_thread = [{"log": "A new assignment has been created", 
+                               "timestamp": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), 
+                               "user_id": assignor_value}]
+                    
+                data = {"task_title": request.data.get("task_title"),
+                        "assignor": assignor_value,
+                        "set_deadline": request.data.get("set_deadline"),
+                        "department": request.data.get("department"),
+                        "add_assignees": request.data.get("add_assignees"),
+                        "sub_tasks": json.dumps(sub_tasks, cls=DatetimeEncoder),
+                        "task_thread": json.dumps(task_thread, cls=DatetimeEncoder),
+                        "priority": request.data.get("priority"),
+                        "task_status": request.data.get("task_status"),}
+                
+                serializer = TaskAssignmentManagerSerializer(data=data)
+                if serializer.is_valid():
+                    serializer.save()
+                    log.info("Task created successfully")
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+                log.error(serializer.errors)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                log.error(str(e))
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        log.critical("User is not SuperAdmin")
+        return Response({"error": "Only SuperAdmin is allowed to create/delete Task"}, status=status.HTTP_400_BAD_REQUEST)
+    
+
+    # VIEW ASSIGNMENT
+    def get(self, request, task_id=None, staff_id=None, *args, **kwargs):
+        try:
+            if staff_id == 'None' and task_id == 'None':
+                staff_id = None
+                task_id = None
+            queryset = TaskAssignmentManager.objects.all().order_by("-created_at")
+            
+            if staff_id is not None and task_id == 'None':
+                queryset = queryset.filter(add_assignees=staff_id).order_by("-created_at")
+                log.info("Assignment data for staff ID#%s fetched successfully", staff_id)
+                payload = apply_pagination(self, request, Paginator, queryset, TaskAssignmentManagerSerializer)
+                return Response(payload, status=status.HTTP_200_OK)
+            
+            if task_id is not None and staff_id == 'None':
+                queryset = TaskAssignmentManager.objects.filter(task_id=task_id).order_by("-created_at")
+                serializer = TaskAssignmentManagerSerializer(queryset, many=True)
+                log.info("Assignment ID#%s fetched successfully", task_id)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            # Filter and search function for list
+            filter_params = {
+                "task_id": self.request.GET.get("task_id"),
+                "created_at": self.request.GET.get("created_at"),
+                "status": self.request.GET.get("status"),
+            }
+
+            # Remove None values from filter_params
+            filters = {field: value for field, value in filter_params.items() if value is not None}
+
+            if filters:
+                queryset = queryset.filter(**filters)
+                
+            # applying pagination
+            payload = apply_pagination(self, request, Paginator, queryset, TaskAssignmentManagerSerializer)
+
+            return Response(payload, status=status.HTTP_200_OK)
+        except TaskAssignmentManager.DoesNotExist:
+            return Response(data={"error": "Batch Purchase Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            log.error(str(e))
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # UPDATE
+    
+    
+    # UPDATE TASK
+    def put(self, request, task_id, *args, **kwargs):
+        try:
+            fetched_data = request.data
+            queryset = TaskAssignmentManager.objects.get(task_id=task_id)
+        except TaskAssignmentManager.DoesNotExist:
+            log.warning("Invalid Assignment ID provided")
+            return Response({"error": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        meta_thread = queryset.task_thread
+        if meta_thread is not None:
+            # Updating Threads
+            loaded_meta_thread = json.loads(meta_thread)
+            loaded_meta_thread.append(fetched_data["task_thread"])
+            update_threads = json.dumps(loaded_meta_thread)
+
+        completed_task_count = 0    
+        for task in fetched_data["sub_tasks"]:
+            if task["status"] == "Completed":
+                completed_task_count+=1
+                
+        if completed_task_count == len(fetched_data["sub_tasks"]):
+            updated_task_status = "COMPLETED"
+        elif datetime.datetime.strptime(str(queryset.set_deadline), "%Y-%m-%d") < datetime.datetime.now():
+            updated_task_status = "OVERDUE"
+        else:
+            updated_task_status = "PENDING"
+        
+        payload = {"sub_tasks": json.dumps(fetched_data["sub_tasks"]), 
+                   "task_thread": update_threads, 
+                   "task_status": updated_task_status}
+
+        serializer = TaskAssignmentManagerSerializer(queryset, data=payload, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            log.info("Assignment with ID#%s has been updated", queryset.task_id)
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        
+        log.error(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+############################################################################################################################
 
 # Appointment view
 class AppointmentManagement(APIView):
@@ -926,7 +1107,6 @@ class AppointmentManagement(APIView):
         log.error(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
     # Delete clinic data
     def delete(self, request, appointment_id, *args, **kwargs):
         try:
@@ -1007,6 +1187,17 @@ class ClientDataManagement(APIView):
                     key_counts[key] += 1
             medProceduresCount = Counter(dict(key_counts))
             
+            date_list = []
+            for client in queryset.values():
+                transactions_details = client.get("transactions_made", {})
+                if transactions_details:
+                    for data in transactions_details:
+                        if data["stripe_payment_status"] == 'paid':
+                            date_list.append(str(data["payment_due_date"]))
+                            date_list.append(str(data["session_created_on"]))
+                    else:
+                        continue
+
             # Getting total due amount
             total_due_amount = Prescription.get_total_due_amount()
 
@@ -1014,6 +1205,7 @@ class ClientDataManagement(APIView):
             prescriptionCount = sum(int(prescription["prescription_count"]) for prescription in payload["Result"])
             appointmentCount = sum(int(appointment["appointment_count"]) for appointment in payload["Result"])
             totalBilling = sum(Decimal(revenue["total_billings"]) for revenue in payload["Result"])
+            avg_payment_credit_time =  sum(days_diff(a, b) for a, b in zip(date_list, date_list[1:])) // (len(date_list) - 1)
             averageBilling = totalBilling / Decimal(len(payload["Result"]))
 
             # Adding a nest in the dictionary for respective variable
@@ -1023,7 +1215,8 @@ class ClientDataManagement(APIView):
                 "total_appointment_handled": appointmentCount,
                 "total_due_amount": Decimal(total_due_amount - totalBilling).quantize(Decimal('0.00')),
                 "total_revenue_generated": totalBilling,
-                "average_patient_treatment_cost": averageBilling
+                "average_patient_treatment_cost": averageBilling,
+                "avg_payment_credit_time": abs(round(avg_payment_credit_time, 2)),
             }
             log.info("Client data generated")
             return Response(payload, status=status.HTTP_200_OK,)
@@ -1034,7 +1227,7 @@ class ClientDataManagement(APIView):
 
 ############################################################################################################################
 
-
+# Drug Inventory 
 class PharmacyInventoryManagement(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -1046,18 +1239,18 @@ class PharmacyInventoryManagement(APIView):
                 "generic_name": request.data.get("generic_name"),
                 "brand_name": request.data.get("brand_name"),
                 "drug_class": request.data.get("drug_class"),
+                "unit_type": request.data.get("unit_type"),
                 "dosage_form": request.data.get("dosage_form"),
-                "unit_price": request.data.get("unit_price"),
-                "quantity": request.data.get("quantity"),
+                "price": request.data.get("price"),
+                "add_new_stock": request.data.get("add_new_stock"),
                 "manufacture_date": request.data.get("manufacture_date"),
                 "lifetime_in_months": request.data.get("lifetime_in_months"),
-                "expiry_date": request.data.get("expiry_date"),
             }
 
             serializer = PharmacyInventorySerializer(data=data)
             if serializer.is_valid():
                 serializer.save()
-                log.info("New Drug %s added successfully", serializer.drug_id)
+                log.info("New Drug added successfully")
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             
             log.critical(serializer.errors)
@@ -1068,9 +1261,17 @@ class PharmacyInventoryManagement(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST,)
         
     # View Drug List
-    def get(self, request, *args, **kwargs):
+    def get(self, request, drug_id=None, *args, **kwargs):
         try:
+            if drug_id == 'None':
+                drug_id = None
             queryset = PharmacyInventory.objects.all().order_by("-added_at")
+            
+            if drug_id is not None:
+                queryset = queryset.filter(drug_id=drug_id)
+                serializer = PharmacyInventorySerializer(queryset, many=True)
+                log.info("Drug %s data fetched successfully", drug_id)
+                return Response(serializer.data, status=status.HTTP_200_OK)
 
             # filter and Search function for list
             filter_params = {
@@ -1120,6 +1321,296 @@ class PharmacyInventoryManagement(APIView):
             log.info("Drug data generated")
             return Response(payload, status=status.HTTP_200_OK,)
 
+        except Exception as e:
+            log.error(str(e))
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Creating and send a request for New Batch Purchase
+class SendBatchPurchaseRequest(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    # CREATE PO
+    def post(self, request, *args, **kwargs):
+        try:
+            cleaned_data = {
+                "order": json.dumps(request.data.get("order")),
+                "total_payment_amount": request.data.get("total_payment_amount"),
+                "created_by": request.data.get("created_by"),
+                "thread_history": json.dumps([request.data.get("thread_history")]),
+                "request_sent_at": request.data.get("request_sent_at"),
+                "status": request.data.get("status"),
+            }
+
+            items = request.data.get("order")
+            user_id = request.data.get("created_by")
+            
+            try:
+                user_data = CustomUser.objects.filter(id=user_id).values().first()
+            except ObjectDoesNotExist:
+                log.warning("User with id %s does not exist", user_id)
+                return Response({"error": "User profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            serializer = PurchaseOrderSerializer(data=cleaned_data)
+            if serializer.is_valid():
+                purchase_order = serializer.save()
+                # Specify the filename for the CSV file
+                filename = f'purchase_order_{purchase_order.purchase_order_id}.csv'
+                # Convert purchase order dictionary to csv file
+                file_path = dict_to_csv(items, filename)
+                # PurchaseOrder instance
+                with open(file_path, 'rb') as file:
+                    purchase_order.PO_report.save(filename, file)
+                # Send an email with the CSV file containing the purchase order
+                send_email_with_attachment(user_data, purchase_order, file=file_path)
+                log.info("New Purchase Order created successfully. Email Sent.")
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            log.error(str(serializer.errors))
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        except ObjectDoesNotExist as e:
+            log.error(str(e))
+            return Response({"error": "User profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            log.error(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # VIEW PO
+    def get(self, request, purchase_order_id=None, *args, **kwargs):
+        try:
+            if purchase_order_id == 'None':
+                purchase_order_id = None
+            queryset = PurchaseOrder.objects.all().order_by("-request_sent_at")
+
+            if purchase_order_id is not None:
+                queryset = queryset.filter(purchase_order_id=purchase_order_id)
+                serializer = PurchaseOrderSerializer(queryset, many=True)
+                log.info("Batch PO ID %s data fetched successfully", purchase_order_id)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            # Filter and search function for list
+            filter_params = {
+                "purchase_order_id": self.request.GET.get("purchase_order_id"),
+                "created_by": self.request.GET.get("created_by"),
+                "status": self.request.GET.get("status"),
+            }
+
+            # Remove None values from filter_params
+            filters = {field: value for field, value in filter_params.items() if value is not None}
+
+            if filters:
+                queryset = queryset.filter(**filters)
+
+            # Applying pagination
+            set_limit = self.request.GET.get("limit")
+            paginator = Paginator(queryset, set_limit)
+            page_number = self.request.GET.get("page")
+            page_obj = paginator.get_page(page_number)
+            serializer = PurchaseOrderSerializer(page_obj, many=True)
+
+            payload = {
+                "Page": {
+                    "totalRecords": queryset.count(),
+                    "current": page_obj.number,
+                    "next": page_obj.has_next(),
+                    "previous": page_obj.has_previous(),
+                    "totalPages": page_obj.paginator.num_pages,
+                },
+                "Result": serializer.data,
+            }
+
+            log.info("Batch Purchase Order data fetched successfully")
+            return Response(payload, status=status.HTTP_200_OK)
+
+        except PurchaseOrder.DoesNotExist:
+            return Response(data={"error": "Batch Purchase Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        except Exception as e:
+            log.error(str(e))
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+    # UPDATE PURCHASE ORDER AND DRUG STOCK AFTER APPROVAL
+    def get_user_data(self, user_id):
+        try:
+            user_data = CustomUser.objects.filter(id=user_id).values().first()
+        except ObjectDoesNotExist:
+            log.warning("User with id %s does not exist", user_id)
+            return Response({"error": "User profile not found."}, status=status.HTTP_404_NOT_FOUND)
+  
+    def get_purchase_order(self, purchase_order_id):
+        try:
+            return PurchaseOrder.objects.get(purchase_order_id=purchase_order_id)
+        except PurchaseOrder.DoesNotExist:
+            return None
+
+    def get_pharmacy_inventory(self, drug_id):
+        try:
+            return PharmacyInventory.objects.get(drug_id=drug_id)
+        except ObjectDoesNotExist:
+            return None
+
+    def get_total_payment_amount(self, order_data):
+        total_payment_amount = 0
+        for drug in order_data:
+            drug_id = drug.get("drugId")
+            drug_info = self.get_pharmacy_inventory(drug_id)
+            if drug_info:
+                quantity = int(drug.get("quantity"))
+                total_payment_amount += Decimal(drug_info.price) * quantity
+        return total_payment_amount
+
+    def update_pharmacy_inventory(self, purchase_order_id, drug_data, quantity):
+        current_stock = drug_data.stock_available
+        new_stock = quantity + current_stock
+        drug_data.stock_available = new_stock
+        current_stock_history = json.loads(json.dumps(drug_data.stock_history))
+        new_order = {
+            "quantity": quantity,
+            "added_on": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "purchase_order_id": purchase_order_id
+        }
+
+        current_stock_history.update(new_order)
+        drug_data.stock_history = json.dumps(current_stock_history)
+        drug_data.save()
+
+    def update_purchase_order(self, purchase_order, status_data, authorized_by, structured_data, thread_data):
+        serializer = PurchaseOrderSerializer(purchase_order, data={
+            "order": json.dumps(structured_data, cls=DecimalEncoder),
+            "total_payment_amount": self.get_total_payment_amount(structured_data),
+            "thread_history": json.dumps(thread_data),
+            }, partial=True)
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        if "SA-" in authorized_by and status_data == "APPROVED":
+            for drug in structured_data:
+                drug_id = drug.get("drugId")
+                quantity = int(drug["quantity"])
+                drug_data = self.get_pharmacy_inventory(drug_id)
+                if drug_data:
+                    purchase_order_id = purchase_order.purchase_order_id
+                    self.update_pharmacy_inventory(purchase_order_id, drug_data, quantity)
+
+            purchase_order = serializer.save()
+            purchase_order.status = PurchaseOrder.StatusCode.APPROVED
+            purchase_order.authorized_by = authorized_by
+            new_thread = {
+                "log": "Purchase Order has been accepted \n& Drug stock has been updated successfully.",
+                "user_id": authorized_by,
+                "timestamp": datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+            }
+            meta_thread_history = json.loads(purchase_order.thread_history)
+            meta_thread_history.append(new_thread)
+            purchase_order.thread_history = json.dumps(meta_thread_history)
+            filename = f'revised_{purchase_order.purchase_order_id}.csv'
+            file_path = dict_to_csv(structured_data, filename)
+            purchase_order.PO_report.save(filename, open(file_path, 'rb'))
+            purchase_order.save()
+            
+            log.info("PO accepted and drug stock updated successfully")
+            # Send email for revised accepted PO order
+            user_data = self.get_user_data(authorized_by)
+            send_email_with_attachment(user_data, purchase_order, file=file_path)
+            log.info("Email for revised PO successfully")
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @method_decorator(cache_page(60 * 15)) 
+    # Cache the view for 15 minutes 
+    def put(self, request, purchase_order_id, *args, **kwargs):
+        purchase_order = self.get_purchase_order(purchase_order_id)
+        if not purchase_order:
+            return Response({"error": "Batch Purchase Order not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Checking PO already approved or not
+        if purchase_order.status == "APPROVED" and purchase_order.authorized_by.exists():
+            return Response({"warning": "PO already approved and can`t be modified."}, status=status.HTTP_423_LOCKED)
+
+        order_data = request.data.get('order')
+        status_data = request.data.get('status')
+        authorized_by = request.data.get('authorized_by')
+        thread_data = request.data.get('thread_history')
+
+        if not isinstance(order_data, list):
+            return Response({"error": "Invalid order data format. Expected a list."}, status=status.HTTP_400_BAD_REQUEST)
+
+        structured_data = []
+        for drug in order_data:
+            drug_id = drug.get("drugId")
+            drug_info = self.get_pharmacy_inventory(drug_id)
+            if not drug_info:
+                return Response({"error": f"Drug with ID {drug_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+            drug["drugURL"] = drug_info.drug_image_url
+            drug["drugName"] = drug_info.drug_name
+            drug["pricePerUnit"] = drug_info.price
+            structured_data.append(drug)
+        return self.update_purchase_order(purchase_order, status_data, authorized_by, structured_data, thread_data)
+
+
+    # DELETE
+    def delete(self, request, purchase_order_id, *args, **kwargs):
+        try:
+            drug_data = PurchaseOrder.objects.get(purchase_order_id=purchase_order_id)
+        except PurchaseOrder.DoesNotExist:
+            log.warning("Invalid Purchase Order ID provided.")
+            return Response({"error": "Batch Purchase Order not found."}, status=status.HTTP_404_NOT_FOUND)
+        drug_data.delete()
+        log.info("%s has been deleted successfully", purchase_order_id)
+        return Response(data={"message": "PO deleted successfully"}, status=status.HTTP_204_NO_CONTENT,)
+
+
+# PO THREAD COMMUNICATION AND LOG MANAGEMENT
+class ThreadManagementView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    # UPDATE THREADS
+    def put(self, request, purchase_order_id, *args, **kwargs):
+        try:
+            queryset = PurchaseOrder.objects.get(purchase_order_id=purchase_order_id)
+        except PurchaseOrder.DoesNotExist:
+            log.warning("Invalid Purchase Order ID provided.")
+            return Response({"error": "Batch Purchase Order not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        new_custom_thread = request.data
+        meta_thread = queryset.thread_history
+        if len(meta_thread) != 0:
+            loaded_meta_thread = json.loads(meta_thread)
+            loaded_meta_thread.append(new_custom_thread)       
+            update_data = {"thread_history": json.dumps(loaded_meta_thread)}
+        else:
+            loaded_meta_thread = []
+            loaded_meta_thread.append(new_custom_thread)
+            update_data = {"thread_history": json.dumps(loaded_meta_thread)}
+        
+        serializer = PurchaseOrderSerializer(queryset, data=update_data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            log.info("%s updated successfully", purchase_order_id)
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+        log.error(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Download Revised Invoice for PO
+class DownloadPOInvoices(APIView):
+    def get(self, request, purchase_order_id, *args, **kwargs):
+        try:
+            purchase_order = PurchaseOrder.objects.filter(purchase_order_id=purchase_order_id).values().first()
+            if not purchase_order:
+                return Response(data={"error": "Purchase Order not found."}, status=status.HTTP_404_NOT_FOUND)
+            json_file = purchase_order["order"]
+            formatted_file = json.loads(json_file)
+            # Creating custom csv file
+            filename = f'RequestOrder_{purchase_order_id}.csv'
+            file_path = dict_to_csv(formatted_file, filename)
+            # Set the appropriate response headers
+            response = FileResponse(open(file_path, 'rb'), content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
         except Exception as e:
             log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1272,7 +1763,6 @@ class FetchPrescriptReceipt(APIView):
             return HttpResponse(f"Error occurred: {str(e)}", status=500)
 
 
-
 # Injecting Stripe secrete details to frontend
 @csrf_exempt
 def stripe_config(request):
@@ -1365,6 +1855,10 @@ class SuccessPaymentView(View):
                 prescription_id = cleaned_data["prescription_id"]
                 try:
                     prescription = Prescription.objects.get(prescription_id=prescription_id)
+                    timestamp = prescription["created_at"]
+                    datetime_obj = datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                    formatted_datetime = datetime_obj.strftime("%d-%m-%Y %H:%M:%S")
+                    cleaned_data["payment_due_date"] = formatted_datetime
                 except Prescription.DoesNotExist:
                     return JsonResponse({'error': f"Prescription with ID {prescription_id} does not exist!"}, status=status.HTTP_400_BAD_REQUEST)
 

@@ -1,8 +1,13 @@
+import json
+from decimal import Decimal, ROUND_DOWN
 from school import settings
 from django.core.mail import send_mail
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
+from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
+
 
 
 #### Email seeding functions #####
@@ -57,14 +62,13 @@ def send_user_profile_update_notification(recipient_list):
     return True
 
 
-# Password reset email
-def send_forget_password_mail(recipient_list, uid, token):
-    reset_password_link = f"http://127.0.0.1:5500/Change-Password/change_password_page.html?uid={uid}&token={token}"
+def send_forget_password_mail(user, uid, token):
+    reset_password_link = f"http://127.0.0.1:5502/template/pages/samples/change-password.html?uid={uid}&token={token}"
     email_from = settings.DEFAULT_FROM_EMAIL
     send_mail(
         "Account Password Reset Notification",
         f"""
-Hi {recipient_list.get('first_name')}, 
+Hi {user.first_name},
 
 There was a request to change your password! 
 Please click this link to change your password: {reset_password_link}
@@ -73,10 +77,11 @@ Kind regards,
 TestProject Support Team
 """,
         email_from,
-        [recipient_list],
+        [user.email],
         fail_silently=False,
     )
     return True
+
 
 
 # Email notification If user changes Profile information
@@ -190,8 +195,66 @@ def send_successful_purchase_email(client, pay_link):
         recipient_list=[client_email],
         html_message=html_message
     )
-    
     return True
+
+
+# Send PO request email with CSV file
+def send_email_with_attachment(user, data, file=None):
+    # Pre-calculate details for email
+    purchase_order_id = data.purchase_order_id
+    count = len(data.order)
+    total_payment_amount = Decimal(data.total_payment_amount)
+    average_unit_price = (total_payment_amount / Decimal(count)).quantize(Decimal('0.00'), rounding=ROUND_DOWN)
+
+    # Create the email message
+    subject = 'New Medicine Batch Purchase Request'
+    from_email = settings.DEFAULT_FROM_EMAIL
+    to_email = user.get("email")
+    
+    context = {
+        "user": user,
+        "count": count,
+        "purchase_order_id": purchase_order_id,
+        "total_payment_amount": total_payment_amount,
+        "average_unit_price": average_unit_price,
+    }
+    html_content = render_to_string("../templates/purchase_request.html", context)
+    
+    text_content = f"""
+    Request for Approval: New Medicine Batch Purchase 
+    
+    Respected {user.get("first_name")}, 
+    I hope this email finds you well. I am writing to request your approval for the purchase of a new batch of medicines. Following are some important Details regarding the Purchase order #{data.purchase_order_id}. 
+    
+    ---------------------------------------------------------------------------
+    |                        ===  Order Summary ===                           |
+    ---------------------------------------------------------------------------
+    | Total Number of Products | Average Unit Price  | Total Payable Amount   |
+    ---------------------------------------------------------------------------
+    |      {count} Nos         |         ${average_unit_price}|     ${total_payment_amount}|
+    ---------------------------------------------------------------------------
+    
+    If you have any questions or require further information, please feel free to reach out to me. Thank you for your attention to this matter. Your support is greatly appreciated! 
+    
+    Kind regards, 
+    TestProject Support Team"""
+
+    msg = EmailMultiAlternatives(subject, text_content, from_email, [to_email])
+    
+    # Attach the file
+    if file is not None:
+        with open(file, 'rb') as f:
+            msg.attach(file.split('/')[-1], f.read(), 'text/csv')
+            
+    # Attach the HTML content as an alternative to support both plain text and HTML
+    msg.attach_alternative(html_content, "text/html")
+    
+    # Send the email
+    msg.send()
+
+
+        
+
 
 
 

@@ -1,1 +1,3 @@
-print(int("3"))
+Inventory check: Audit and replenish medical supplies in the lab. (e.g., gloves, test tubes), Equipment maintenance: Inspect and calibrate lab machinery. Report any malfunctions, Data analysis: Analyze lab test results for patterns and anomalies. Prepare summary report, Safety training: Conduct a session on lab safety protocols for new staff, Quality control: Monitor lab procedures to ensure accuracy and compliance with standards.
+
+Hospital Lab  Monthly Task

@@ -4,11 +4,13 @@ from .models import (
     CustomUser,
     Clinic,
     ClinicMember,
+    TaskAssignmentManager,
     MedicalProceduresTypes,
     ClientDataCollectionPool,
     PatientAppointment,
     Prescription,
     PharmacyInventory,
+    PurchaseOrder,
     ClientServiceFeedback,
 )
 
@@ -106,6 +108,14 @@ class ClinicStaffSerializer(serializers.ModelSerializer):
         )
 
 
+# Task Manager
+class TaskAssignmentManagerSerializer(serializers.ModelSerializer):
+    created_at = serializers.ReadOnlyField()
+    class Meta:
+        model = TaskAssignmentManager
+        fields = "__all__"
+
+
 # Choices for appointment related medical procedures
 class MedicalProceduresTypesSerializer(serializers.ModelSerializer):
     class Meta:
@@ -139,9 +149,16 @@ class ClientDataCollectionPoolSerializer(serializers.ModelSerializer):
 # Drug Inventory Information
 class PharmacyInventorySerializer(serializers.ModelSerializer):
     added_at = serializers.ReadOnlyField()
-
     class Meta:
         model = PharmacyInventory
+        fields = "__all__"
+        
+        
+# Purchase order for Drug
+class PurchaseOrderSerializer(serializers.ModelSerializer):
+    request_sent_at = serializers.ReadOnlyField()
+    class Meta:
+        model = PurchaseOrder
         fields = "__all__"
 
 

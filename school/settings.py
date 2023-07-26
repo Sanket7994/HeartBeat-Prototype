@@ -20,7 +20,6 @@ SECRET_KEY = "django-insecure-)c8b(r@v&9un)eb(1i-v-py9e3)klc#)#p=gy^i53woq29x%jf
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
 ALLOWED_HOSTS = []
 
 
@@ -64,6 +63,10 @@ AUTH_PROFILE_MODULE = "base_app.Profile"
 SENDSMS_BACKEND = "sendsms.backends.console.SmsBackend"
 
 # If this is used then `CORS_ALLOWED_ORIGINS` will not have any effect
+CORS_ORIGIN_WHITELIST = [
+    'http://127.0.0.1:5502',
+    'http://127.0.0.1:5500',]
+
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
@@ -85,8 +88,8 @@ AUTHENTICATION_BACKENDS = (("django.contrib.auth.backends.ModelBackend"),)
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=2),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=5),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,

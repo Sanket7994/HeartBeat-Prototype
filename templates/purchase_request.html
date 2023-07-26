@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Request for Approval: New Medicine Batch Purchase</title>
+</head>
+
+<body>
+  <p>Respected {{ user.first_name }},</p>
+  <p>I hope this email finds you well. I am writing to request your approval for the purchase of a new batch of
+    medicines.</p>
+  <p>Following are some important Details regarding the<strong> Purchase order #{{ purchase_order_id }}</strong>.</p>
+  <br>
+  <table style="border: 1px solid #333; text-align: center; width: 300px;">
+    <caption style="caption-side: top; margin-bottom: 10px;">
+      <h5>Order Summary</h5>
+    </caption>
+    <tr style="border: 1px solid #333; text-align: center;">
+      <th>Total Number of Products</th>
+      <th>Average Unit Price</th>
+      <th>Total Payable Amount</th>
+    </tr>
+    <tr style="border: 1px solid #333; text-align: center;">
+      <td>{{ count }} Units</td>
+      <td>${{ average_unit_price }}</td>
+      <td>${{ total_payment_amount }}</td>
+    </tr>
+  </table>
+  <br>
+  <p>If you have any questions or require further information, please feel free to reach out to me.</p>
+  <p>Thank you for your attention to this matter. Your support is greatly appreciated!</p>
+  <br>
+  <p>Kind regards,
+  <p>TestProject Support Team</p>
+</body>
+</html>
