@@ -2,14 +2,10 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from . import helper_functions
-from .views import MyTokenObtainPairView, TokenRefreshView, LogoutView
-from .views import ClinicListView, StaffRelationshipManagementView
-from .views import AppointmentManagement, PharmacyInventoryManagement, PrescriptionManagement
-from .views import PingTest, LoginView, SignupView, ForgotPasswordView
-from .views import ResendOTP, ResetPasswordView, UserRetrieveUpdateAPIView, VerifyOTPView
-from .views import FetchPrescriptReceipt, PrescriptionPaymentCheckoutSessionView, CancelPaymentView, SuccessPaymentView
-from .views import ClientDataManagement, CustomerFeedbackView, SendBatchPurchaseRequest, ThreadManagementView
-from .views import DownloadPOInvoices, TaskManager
+from .views import *
+
+#seller view
+from .med_seller import FetchProducts, PurchaseOrderCheckoutSession, SuccessPOPaymentView, CancelPOPaymentView
 
 
 urlpatterns = [
@@ -41,6 +37,10 @@ urlpatterns = [
     path('task-manager/view/<str:staff_id>/<str:task_id>', TaskManager.as_view(), name='view-assignment'),
     path('task-manager/update/<str:task_id>', TaskManager.as_view(), name='update-assignment'),
     
+    path('<str:id>/personal-journal/create-entry/', PersonalJournalView.as_view(), name='create-journal-entry'),
+    path('<str:id>/personal-journal/view/<str:range>/<str:note_id>', PersonalJournalView.as_view(), name='view-journal-entry'),
+    path('<str:id>/personal-journal/update/<str:note_id>', PersonalJournalView.as_view(), name='update-journal-entry'),
+   
     path('clinic/scheduler/appointments/availability/', AppointmentManagement.as_view(), name='check-availability'),
     
     path('client/view/', ClientDataManagement.as_view(), name='view-client-data'),
@@ -77,6 +77,13 @@ urlpatterns = [
     path('api/token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/logout_token/', LogoutView.as_view(), name='logout_token'), 
+    
+    #seller
+    path('seller/products', FetchProducts.as_view(), name='seller-product-display'),
+    path('seller/<str:purchase_order_id>/initiate-payment', PurchaseOrderCheckoutSession.as_view(), name='initiate-payment'),
+    path('<str:purchase_order_id>/payment/success', SuccessPOPaymentView.as_view(), name='success-payment-view'),
+    path('<str:purchase_order_id>/payment/cancel', CancelPOPaymentView.as_view(), name='cancel-payment-view'),    
+    
 ]
 
 

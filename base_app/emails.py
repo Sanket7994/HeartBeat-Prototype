@@ -18,26 +18,13 @@ def send_email_notification(recipient_list, fetched_activation_OTP):
     email_from = settings.DEFAULT_FROM_EMAIL
     subject = "Account Update Notification"
     html_body = f"""
-<div style="font-family: Helvetica,Arial,sans-serif;min-width:1000px;overflow:auto;line-height:2">
-  <div style="margin:50px auto;width:70%;padding:20px 0">
-    <div style="border-bottom:1px solid #eee;display:flex;align-items:center;">
-      <div style="transform: rotate(-90deg);margin-right:10px;">
-        <img src="../media/SHIPSY_LOGO_BIRD_BLUE.png" alt="Brand Logo" width="50">
-      </div>
-      <a href="" style="font-size:1.4em;color: #00466a;text-decoration:none;font-weight:600;white-space: nowrap;">TestProject</a>
-    </div>
-    <p style="font-size:1.1em">Hi,</p>
-    <p>Thank you for choosing TestProject. Use the following OTP to complete your Sign Up procedures. OTP is valid for 10 minutes</p>
-    <h2 style="background: #00466a;margin: 0 auto;width: max-content;padding: 0 10px;color: #fff;border-radius: 4px;">{fetched_activation_OTP}</h2>
-    <p style="font-size:0.9em;">Regards,<br />TestProject</p>
-    <hr style="border:none;border-top:1px solid #eee" />
-    <div style="float:right;padding:8px 0;color:#aaa;font-size:0.8em;line-height:1;font-weight:300">
-      <p>TestProject Inc</p>
-      <p>Madrid</p>
-      <p></p>
-    </div>
-  </div>
-</div>
+    Hi
+    Thank you for choosing TestProject. Use the following OTP to complete your Sign Up procedures. 
+    OTP is valid for 10 minutes.
+    {fetched_activation_OTP}
+    Regards, 
+    TestProject
+
     """
     send_mail(subject, html_body, email_from, recipient_list)
 
@@ -81,7 +68,6 @@ TestProject Support Team
         fail_silently=False,
     )
     return True
-
 
 
 # Email notification If user changes Profile information
@@ -202,9 +188,10 @@ def send_successful_purchase_email(client, pay_link):
 def send_email_with_attachment(user, data, file=None):
     # Pre-calculate details for email
     purchase_order_id = data.purchase_order_id
-    count = len(data.order)
+    order_list = json.loads(data.order)
+    order_count = len(order_list)
     total_payment_amount = Decimal(data.total_payment_amount)
-    average_unit_price = (total_payment_amount / Decimal(count)).quantize(Decimal('0.00'), rounding=ROUND_DOWN)
+    average_unit_price = (total_payment_amount / Decimal(order_count)).quantize(Decimal('0.00'), rounding=ROUND_DOWN)
 
     # Create the email message
     subject = 'New Medicine Batch Purchase Request'
@@ -213,7 +200,7 @@ def send_email_with_attachment(user, data, file=None):
     
     context = {
         "user": user,
-        "count": count,
+        "count": order_count,
         "purchase_order_id": purchase_order_id,
         "total_payment_amount": total_payment_amount,
         "average_unit_price": average_unit_price,
@@ -231,7 +218,7 @@ def send_email_with_attachment(user, data, file=None):
     ---------------------------------------------------------------------------
     | Total Number of Products | Average Unit Price  | Total Payable Amount   |
     ---------------------------------------------------------------------------
-    |      {count} Nos         |         ${average_unit_price}|     ${total_payment_amount}|
+    |      {order_count} Nos         |         ${average_unit_price}|     ${total_payment_amount}|
     ---------------------------------------------------------------------------
     
     If you have any questions or require further information, please feel free to reach out to me. Thank you for your attention to this matter. Your support is greatly appreciated! 

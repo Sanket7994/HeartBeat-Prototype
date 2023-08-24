@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_countries",
+    'paypal.standard.ipn',  
     "base_app",
 ]
 
@@ -206,6 +207,7 @@ EMAIL_PORT = 587
 
 # Stripe
 YOUR_DOMAIN = "http://127.0.0.1:8000"
+STRIPE_CUSTOMER_ID = "cus_OSbaOsr6TQclT2"
 STRIPE_PUBLIC_KEY = "pk_test_51NKxAZSFXVKGwTOE3k746d8zjMGt96O4knpOzN4JYh4U8cqAuSEZWLFEGHdCdIAWifpdaW9O3qpvRwtu7KFFP9Pa003CdiLm9V"
 STRIPE_SECRET_KEY = "sk_test_51NKxAZSFXVKGwTOE3rbvA7SELiFfxathCQTnJ61bRcQGmvyOxHgCOzTKHhwrvJQpyTV1KWkH2yVbMvpVP5ywM6bb000PUpwvWd"
 STRIPE_WEBHOOK_SECRET = (
@@ -214,6 +216,13 @@ STRIPE_WEBHOOK_SECRET = (
 APPOINTMENT_SERVICE_ID = "prod_O7aPUsz3hdJci5"
 APPOINTMENT_PRICE_ID = "price_1NLLEDSFXVKGwTOEQfFZMyW1"
 
+
+# Paypal
+PAYPAL_ID = "AcfJvllkdPugefuAMr5kOjWc6nMccIusYV6K-5qyQDwrSb8K33FVWIzsUSiagIAmSjCTWFrcRnmMrI1a"
+PAYPAL_SECRET= "EJRxeikvJ2__LzVhMRE-VZYHzYZIMb8eRINNsJwIwf4x8JJz0bjFa0PjUuiSLzs8XgF28ZlGn7yi_MCS"
+PAYPAL_BASE_URL= 'https://api.sandbox.paypal.com' 
+PAYPAL_RECEIVER_EMAIL = 'sanket.chouriya@oodles.io'
+PAYPAL_TEST = True
 
 # Calling Logger
 from .logger import LOGGING

@@ -17,17 +17,8 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from django.shortcuts import render
 from django.db.models import F
 from django.conf import settings
-from .views import (
-    Clinic,
-    ClinicMember,
-    PatientAppointment,
-    MedicalProceduresTypes,
-    Prescription,
-    ClientDataCollectionPool,
-)
-from .serializer import (
-    MedicalProceduresTypes,
-    PrescriptionSerializer,)
+from .views import *
+from .serializer import *
 
 
 
@@ -222,7 +213,7 @@ def clean_payment_data(data):
     cleaned_data = {}
     for key, value in data.items():
         if isinstance(value, dict):
-            cleaned_data[key] = clean_payment_data(value)  # Corrected the function name
+            cleaned_data[key] = clean_payment_data(value)  
         else:
             if value == "null":
                 cleaned_data[key] = None
@@ -239,7 +230,6 @@ def clean_payment_data(data):
 def create_payment_link(prescription_dict, return_items=False):
     try:
         data = json.loads(prescription_dict["medications_json"])
-
         stripe.api_key = settings.STRIPE_SECRET_KEY
 
         line_items = [

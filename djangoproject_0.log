@@ -1,0 +1,537 @@
+2023-08-08 07:13:39,204 [Thread-14   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:13:39,207 [Thread-14   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:13:40,743 [Thread-14   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:13:40,745 [Thread-14   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:13:40,760 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:13:40,766 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:13:41,454 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:13:41,465 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:13:41,508 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:13:41,510 [Thread-14   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:13:41,541 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:13:41,546 [Thread-14   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:13:41,546 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:13:41,551 [Thread-14   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:13:41,552 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:13:41,554 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:15:05,468 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:15:05,473 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:15:05,481 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:15:05,489 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:15:13,985 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:15:13,988 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:15:13,996 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:15:13,998 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:15:19,060 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:15:19,068 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:15:19,105 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:15:19,106 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:15:32,849 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:15:32,852 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:15:32,876 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:15:32,884 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:15:58,384 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:15:58,397 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:15:58,434 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:15:58,448 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:15:59,679 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:15:59,693 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:15:59,748 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:15:59,750 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:16:02,164 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:16:02,171 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:16:02,193 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:16:02,195 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:16:13,158 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:16:13,163 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:16:13,176 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:16:13,177 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:16:48,436 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:16:48,444 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:18:20,704 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:18:20,706 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:18:20,838 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:18:20,846 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:18:20,854 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:18:20,855 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:18:21,853 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:18:21,865 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:18:34,513 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:18:34,514 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:19:37,404 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:19:37,407 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:19:37,425 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:19:37,439 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:20:20,088 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:20:20,093 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:20:20,126 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:20:20,135 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:20:28,635 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:20:28,639 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:20:28,722 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:20:28,751 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:20:29,623 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:20:29,633 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:20:38,037 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:20:38,040 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:21:00,221 [Thread-15   ] [INFO ] [django.server       ]  "OPTIONS /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 0
+2023-08-08 07:21:00,230 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:21:00,233 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:21:00,420 [Thread-15   ] [INFO ] [django.server       ]  "OPTIONS /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 0
+2023-08-08 07:21:00,433 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:21:00,452 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:21:15,982 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:21:15,987 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:21:16,011 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:21:16,019 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:22:13,636 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:22:13,642 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:22:13,810 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:22:13,819 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:22:17,519 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:22:17,521 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:22:17,540 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:22:17,548 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:22:19,601 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:22:19,608 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:22:19,618 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:22:19,621 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:22:20,552 [Thread-13   ] [INFO ] [django.server       ]  "OPTIONS /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 0
+2023-08-08 07:22:20,566 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:22:20,578 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:22:20,634 [Thread-13   ] [INFO ] [django.server       ]  "OPTIONS /clinic/allusers?limit=50&page=1 HTTP/1.1" 200 0
+2023-08-08 07:22:36,889 [Thread-13   ] [INFO ] [django.server       ]  "OPTIONS /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 0
+2023-08-08 07:22:36,941 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:22:36,943 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:24:28,567 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:24:28,570 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:24:28,577 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:24:28,588 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:25:45,368 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:25:45,374 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:25:45,384 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:25:45,393 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:25:47,018 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:25:47,024 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:25:47,063 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:25:47,070 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:26:01,901 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:26:01,902 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:26:01,913 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:26:01,917 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:26:04,659 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:26:04,665 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:26:04,671 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:26:04,677 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:26:10,061 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:26:10,064 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:26:10,076 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:26:10,084 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:26:16,176 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:26:16,188 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:26:16,193 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:26:16,197 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:26:39,500 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:26:39,502 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:26:39,516 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:26:39,524 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:26:40,535 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:26:40,546 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:26:51,225 [Thread-13   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:26:51,241 [Thread-16   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:26:51,263 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:26:51,266 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:26:51,270 [Thread-16   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:26:51,277 [Thread-16   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:26:51,279 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:26:51,281 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:27:00,199 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:27:00,204 [Thread-16   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:27:00,228 [Thread-16   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:27:00,231 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:27:00,232 [Thread-16   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:27:00,235 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:27:14,381 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:27:14,383 [Thread-16   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:27:14,391 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:27:14,406 [Thread-16   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:27:15,848 [Thread-16   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:27:15,863 [Thread-16   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:27:18,033 [Thread-13   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:27:18,048 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:27:18,071 [Thread-16   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:27:18,075 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:27:18,076 [Thread-16   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:27:18,078 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:27:18,082 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:27:18,085 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:27:32,821 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:27:32,858 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:27:32,861 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:27:32,871 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:27:32,880 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:27:32,882 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:27:38,547 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:27:38,551 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:27:38,553 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:27:38,572 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:32:31,140 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:32:31,144 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:32:31,147 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:32:31,155 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:32:33,480 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:32:33,485 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:32:33,509 [Thread-13   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:32:33,512 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:32:33,535 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:32:33,542 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:32:33,542 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:32:33,546 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:32:33,553 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:32:33,555 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:32:43,005 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:32:43,010 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:32:43,029 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:32:43,032 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:32:43,032 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:32:43,034 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:32:45,434 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:32:45,435 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:32:45,439 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:32:45,445 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:33:58,715 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:33:58,724 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:34:01,818 [Thread-13   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:34:01,836 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:34:01,872 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:34:01,879 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:34:01,887 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:34:01,889 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:34:01,890 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:34:01,892 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:34:09,253 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:34:09,259 [Thread-13   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:34:09,280 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:34:09,285 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:34:09,292 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:34:09,294 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:34:25,430 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:34:25,437 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:34:25,445 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:34:25,452 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:34:26,505 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:34:26,509 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:34:27,474 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:34:27,476 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:34:27,502 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:34:27,507 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:34:27,514 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:34:27,521 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:34:27,524 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:34:27,526 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:34:33,082 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:34:33,094 [Thread-13   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:34:33,111 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:34:33,115 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:34:33,125 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:34:33,126 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:35:25,288 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:35:25,293 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:35:25,308 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:35:25,309 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:35:27,579 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:35:27,582 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:35:27,605 [Thread-15   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:35:27,612 [Thread-15   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:35:53,060 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:35:53,078 [Thread-15   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:35:53,081 [Thread-15   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:35:53,082 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:35:56,314 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:35:56,320 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:35:56,329 [Thread-13   ] [INFO ] [django.server       ]  "OPTIONS /clinic/allusers?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 0
+2023-08-08 07:35:56,349 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:35:56,366 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:35:56,368 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:35:56,378 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:35:56,382 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:35:56,384 [Thread-17   ] [INFO ] [django.server       ]  "OPTIONS /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 0
+2023-08-08 07:35:56,433 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:35:56,451 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:35:56,453 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:35:57,585 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:35:57,589 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:35:57,600 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:35:57,610 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:35:58,585 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:35:58,596 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:35:58,642 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:35:58,643 [Thread-13   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:35:58,678 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:35:58,684 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:35:58,685 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:35:58,692 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:35:58,692 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:35:58,694 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:36:53,928 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:36:53,932 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:36:54,061 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:36:54,070 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:37:01,267 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:37:01,274 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:37:01,277 [Thread-13   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:37:01,286 [Thread-13   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:37:03,625 [Thread-13   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:37:03,628 [Thread-13   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:37:03,631 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:37:03,638 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:37:04,967 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:37:04,983 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:37:05,011 [Thread-15   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:37:05,017 [Thread-13   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:37:05,039 [Thread-15   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:37:05,054 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:37:05,059 [Thread-15   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:37:05,059 [Thread-13   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:37:05,064 [Thread-13   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:37:05,065 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:39:26,640 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:39:26,646 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:39:26,656 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:39:26,668 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:40:09,661 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:40:09,669 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:42:33,095 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:42:33,098 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:42:33,108 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:42:33,120 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:42:45,424 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:42:45,427 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:42:45,437 [Thread-18   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:42:45,449 [Thread-18   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:44:30,219 [Thread-18   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:44:30,230 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:44:30,237 [Thread-18   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:44:30,244 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:48:31,923 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:48:31,932 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:48:31,934 [Thread-18   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:48:31,944 [Thread-18   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:49:31,297 [Thread-18   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:49:31,300 [Thread-18   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:49:31,369 [Thread-18   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:49:31,378 [Thread-18   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:49:32,785 [Thread-18   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:49:32,808 [Thread-18   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:49:32,830 [Thread-18   ] [INFO ] [django.server       ]  "OPTIONS /clinic/allusers?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 0
+2023-08-08 07:49:32,853 [Thread-19   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:49:32,881 [Thread-19   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:49:32,883 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:49:32,883 [Thread-19   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:49:32,885 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:49:32,895 [Thread-17   ] [INFO ] [django.server       ]  "OPTIONS /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 0
+2023-08-08 07:49:32,946 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:49:32,957 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:49:32,961 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:51:27,277 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:51:27,290 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:51:27,300 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:51:27,304 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:53:00,942 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:53:00,945 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:53:00,955 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:53:00,963 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:53:12,438 [Thread-19   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:53:12,447 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:53:12,449 [Thread-19   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:53:12,456 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:53:37,328 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:53:37,337 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:53:37,346 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:53:37,361 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:53:39,449 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:53:39,454 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:53:39,478 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:53:39,482 [Thread-18   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:53:39,505 [Thread-18   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:53:39,512 [Thread-18   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:53:39,513 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:53:39,519 [Thread-19   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:53:39,521 [Thread-19   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:53:39,521 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:53:40,177 [Thread-19   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:53:40,181 [Thread-19   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:53:40,200 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:53:40,209 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:53:41,120 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:53:41,134 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:53:41,184 [Thread-18   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:53:41,186 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:53:41,215 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:53:41,216 [Thread-19   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:53:41,219 [Thread-19   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:53:41,220 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:53:41,227 [Thread-18   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:53:41,230 [Thread-18   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:53:52,431 [Thread-19   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:53:52,434 [Thread-19   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:53:52,473 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:53:52,486 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:54:10,235 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:54:10,243 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:54:10,268 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:54:10,271 [Thread-18   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:54:10,297 [Thread-19   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:54:10,300 [Thread-19   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:54:10,317 [Thread-18   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:54:10,320 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:54:10,324 [Thread-18   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:54:10,325 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:54:36,101 [Thread-19   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:54:36,107 [Thread-19   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:54:36,113 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:54:36,125 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:54:37,390 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:54:37,403 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:54:37,440 [Thread-18   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:54:37,449 [Thread-19   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:54:37,464 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:54:37,466 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:54:37,475 [Thread-18   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:54:37,478 [Thread-18   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:54:37,484 [Thread-19   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:54:37,487 [Thread-19   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:58:43,098 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 07:58:43,101 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 07:58:43,112 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 07:58:43,119 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 07:58:44,148 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 07:58:44,151 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 07:58:44,174 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:58:44,176 [Thread-18   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:58:44,199 [Thread-18   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:58:44,203 [Thread-18   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:58:44,216 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:58:44,216 [Thread-19   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:58:44,219 [Thread-19   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 07:58:44,220 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 07:59:19,756 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 07:59:19,758 [Thread-19   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 07:59:19,795 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:59:19,800 [Thread-19   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 07:59:19,800 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 07:59:19,804 [Thread-19   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 08:00:12,571 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:00:12,576 [Thread-19   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:00:12,592 [Thread-19   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:00:12,595 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:00:38,602 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:00:38,610 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:00:38,613 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:00:38,617 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:00:47,169 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:00:47,172 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:00:47,178 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:00:47,188 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:00:48,668 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 08:00:48,680 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 08:00:48,710 [Thread-18   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 08:00:48,715 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 08:00:48,743 [Thread-19   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 08:00:48,743 [Thread-18   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 08:00:48,746 [Thread-19   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 08:00:48,751 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 08:00:48,751 [Thread-18   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 08:00:48,754 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 08:00:50,087 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:00:50,091 [Thread-19   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:00:50,099 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:00:50,100 [Thread-19   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:00:50,756 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 08:00:50,769 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 08:00:50,800 [Thread-18   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 08:00:50,803 [Thread-17   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 08:00:50,830 [Thread-18   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 08:00:50,840 [Thread-18   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 08:00:50,841 [Thread-17   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 08:00:50,844 [Thread-17   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 08:00:50,850 [Thread-19   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 08:00:50,851 [Thread-19   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 08:00:54,716 [Thread-19   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 08:00:54,734 [Thread-19   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 08:00:54,736 [Thread-19   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 08:00:56,183 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:00:56,193 [Thread-19   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:00:56,199 [Thread-19   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:00:56,200 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:03:17,938 [Thread-17   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:03:17,952 [Thread-19   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:03:17,959 [Thread-17   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:03:17,963 [Thread-19   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:03:24,356 [Thread-19   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:03:24,361 [Thread-17   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:03:24,369 [Thread-17   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:03:24,371 [Thread-19   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:23:47,257 [Thread-20   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:23:47,258 [Thread-21   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:23:47,269 [Thread-21   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:23:47,277 [Thread-20   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:24:01,852 [Thread-21   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:24:01,855 [Thread-21   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:24:01,864 [Thread-20   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:24:01,875 [Thread-20   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:24:03,514 [Thread-20   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:24:03,517 [Thread-20   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:24:03,525 [Thread-21   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:24:03,535 [Thread-21   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:24:07,889 [Thread-21   ] [INFO ] [base_app.views      ]  Assignment ID#TSK-A706B2903B fetched successfully
+2023-08-08 08:24:07,894 [Thread-21   ] [INFO ] [django.server       ]  "GET /task-manager/view/None/TSK-A706B2903B HTTP/1.1" 200 1380
+2023-08-08 08:24:07,914 [Thread-20   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': 'E9CE502E28'}
+2023-08-08 08:24:07,922 [Thread-22   ] [DEBUG] [base_app.views      ]  Filter triggered: {'staff_id': '8E1BFB73A3'}
+2023-08-08 08:24:07,940 [Thread-20   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 08:24:07,949 [Thread-21   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 08:24:07,951 [Thread-21   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1 HTTP/1.1" 200 3361
+2023-08-08 08:24:07,952 [Thread-20   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=E9CE502E28 HTTP/1.1" 200 497
+2023-08-08 08:24:07,959 [Thread-22   ] [INFO ] [base_app.views      ]  Staff Member data generated successfully
+2023-08-08 08:24:07,961 [Thread-22   ] [INFO ] [django.server       ]  "GET /clinic/allusers/?limit=50&page=1&staff_id=8E1BFB73A3 HTTP/1.1" 200 496
+2023-08-08 08:25:05,257 [Thread-21   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:25:05,261 [Thread-22   ] [INFO ] [base_app.views      ]  Assignment data for staff ID#CM-3A9E3304E4 fetched successfully
+2023-08-08 08:25:05,267 [Thread-21   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:25:05,268 [Thread-22   ] [INFO ] [django.server       ]  "GET /task-manager/view/CM-3A9E3304E4/None?limit=4&page=1 HTTP/1.1" 200 1474
+2023-08-08 08:25:08,367 [Thread-21   ] [INFO ] [django.server       ]  "OPTIONS /CM-3A9E3304E4/personal-journal/view/None/None?limit=30&page=1 HTTP/1.1" 200 0
+2023-08-08 08:25:08,378 [Thread-22   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:25:08,386 [Thread-22   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:25:08,396 [Thread-21   ] [INFO ] [django.server       ]  "GET /CM-3A9E3304E4/personal-journal/view/None/None?limit=30&page=1 HTTP/1.1" 200 929
+2023-08-08 08:25:09,599 [Thread-22   ] [INFO ] [django.server       ]  "GET /CM-3A9E3304E4/personal-journal/view/None/None?limit=30&page=1 HTTP/1.1" 200 929
+2023-08-08 08:25:09,602 [Thread-21   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:25:09,604 [Thread-21   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:25:10,334 [Thread-21   ] [INFO ] [django.server       ]  "OPTIONS /CM-3A9E3304E4/personal-journal/view/8-8/4 HTTP/1.1" 200 0
+2023-08-08 08:25:10,348 [Thread-21   ] [INFO ] [base_app.views      ]  Journal Note ID#4 accessed successfully
+2023-08-08 08:25:10,351 [Thread-21   ] [INFO ] [django.server       ]  "GET /CM-3A9E3304E4/personal-journal/view/8-8/4 HTTP/1.1" 200 833
+2023-08-08 08:25:12,482 [Thread-21   ] [INFO ] [base_app.views      ]  Journal Note ID#4 accessed successfully
+2023-08-08 08:25:12,495 [Thread-21   ] [INFO ] [django.server       ]  "GET /CM-3A9E3304E4/personal-journal/view/8-8/4 HTTP/1.1" 200 833
+2023-08-08 08:25:18,093 [Thread-22   ] [INFO ] [django.server       ]  "GET /CM-3A9E3304E4/personal-journal/view/None/None?limit=30&page=1 HTTP/1.1" 200 929
+2023-08-08 08:25:18,097 [Thread-21   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:25:18,102 [Thread-21   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:25:35,321 [Thread-21   ] [INFO ] [django.server       ]  "OPTIONS /clinic/scheduler/appointments/view?limit=500&page=1 HTTP/1.1" 200 0
+2023-08-08 08:25:35,322 [Thread-20   ] [INFO ] [django.server       ]  "OPTIONS /clinic/scheduler/appointments/prescription/view?limit=5&page=1 HTTP/1.1" 200 0
+2023-08-08 08:25:35,323 [Thread-22   ] [INFO ] [django.server       ]  "OPTIONS /client/view?limit=5&page=1 HTTP/1.1" 200 0
+2023-08-08 08:25:35,330 [Thread-23   ] [INFO ] [base_app.views      ]  Profile generated
+2023-08-08 08:25:35,333 [Thread-23   ] [INFO ] [django.server       ]  "GET /profile/id=CM-3A9E3304E4 HTTP/1.1" 200 208
+2023-08-08 08:25:35,373 [Thread-23   ] [INFO ] [django.server       ]  "OPTIONS /clinic/scheduler/appointments/view/?limit=500&page=1 HTTP/1.1" 200 0
+2023-08-08 08:25:35,376 [Thread-20   ] [INFO ] [django.server       ]  "OPTIONS /client/view/?limit=5&page=1 HTTP/1.1" 200 0
+2023-08-08 08:25:35,377 [Thread-22   ] [INFO ] [django.server       ]  "OPTIONS /clinic/scheduler/appointments/prescription/view/?limit=5&page=1 HTTP/1.1" 200 0
+2023-08-08 08:25:35,388 [Thread-22   ] [INFO ] [django.server       ]  "OPTIONS /finance/view-customer-feedback?limit=99&page=1 HTTP/1.1" 200 0
+2023-08-08 08:25:35,418 [Thread-21   ] [INFO ] [base_app.views      ]  Prescription data generated
+2023-08-08 08:25:35,419 [Thread-23   ] [INFO ] [base_app.views      ]  View all appointment data API triggered.
+2023-08-08 08:25:35,430 [Thread-20   ] [INFO ] [base_app.views      ]  Client data generated
+2023-08-08 08:25:35,432 [Thread-21   ] [INFO ] [django.server       ]  "GET /clinic/scheduler/appointments/prescription/view/?limit=5&page=1 HTTP/1.1" 200 6268
+2023-08-08 08:25:35,436 [Thread-20   ] [INFO ] [django.server       ]  "GET /client/view/?limit=5&page=1 HTTP/1.1" 200 5075
+2023-08-08 08:25:35,456 [Thread-23   ] [INFO ] [base_app.views      ]  All Appointment Data fetched Successfully
+2023-08-08 08:25:35,458 [Thread-23   ] [INFO ] [django.server       ]  "GET /clinic/scheduler/appointments/view/?limit=500&page=1 HTTP/1.1" 200 4288
+2023-08-08 08:25:35,542 [Thread-23   ] [INFO ] [base_app.views      ]  Client data generated
+2023-08-08 08:25:35,544 [Thread-23   ] [INFO ] [django.server       ]  "GET /client/view/?limit=5&page=1 HTTP/1.1" 200 5075
+2023-08-08 08:25:35,557 [Thread-20   ] [INFO ] [django.server       ]  "OPTIONS /finance/view-customer-feedback/?limit=99&page=1 HTTP/1.1" 200 0
+2023-08-08 08:25:35,570 [Thread-20   ] [INFO ] [base_app.views      ]  Feedback data generated
+2023-08-08 08:25:35,572 [Thread-20   ] [INFO ] [django.server       ]  "GET /finance/view-customer-feedback/?limit=99&page=1 HTTP/1.1" 200 477
+2023-08-08 09:19:40,912 [MainThread  ] [INFO ] [django.utils.autorel]  /home/sanket/Desktop/DRF_TestProjects-main/DRF_School/base_app/emails.py changed, reloading.
