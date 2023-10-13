@@ -3,10 +3,12 @@ Django settings for school project.
 
 """
 import os
+import redis
 import logging.config
 from pathlib import Path
 from datetime import timedelta
 from django.utils.log import DEFAULT_LOGGING
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,7 +39,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_countries",
-    'paypal.standard.ipn',  
+    "paypal.standard.ipn",
     "base_app",
 ]
 
@@ -65,8 +67,9 @@ SENDSMS_BACKEND = "sendsms.backends.console.SmsBackend"
 
 # If this is used then `CORS_ALLOWED_ORIGINS` will not have any effect
 CORS_ORIGIN_WHITELIST = [
-    'http://127.0.0.1:5502',
-    'http://127.0.0.1:5500',]
+    "http://127.0.0.1:5502",
+    "http://127.0.0.1:5500",
+]
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
@@ -141,6 +144,29 @@ TEMPLATES = [
 WSGI_APPLICATION = "school.wsgi.application"
 
 
+# REDIS SETUP
+
+# Use an environment variable for Redis URL
+REDIS_LOCATION = "redis://127.0.0.1:6379/1"
+
+# Test Redis Connection
+try:
+    redis_client = redis.StrictRedis.from_url(REDIS_LOCATION)
+    redis_client.ping()
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_LOCATION,
+            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+            "KEY_PREFIX": "example",
+        }
+    }
+    CACHE_TIMEOUT = 600
+    print("Redis Connected Successfully")
+except redis.ConnectionError as e:
+    print(f"Redis Connection failed: {e}")
+
+
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
@@ -182,7 +208,7 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+USE_TZ = False
 
 
 # Static files (CSS, JavaScript, Images)
@@ -218,10 +244,14 @@ APPOINTMENT_PRICE_ID = "price_1NLLEDSFXVKGwTOEQfFZMyW1"
 
 
 # Paypal
-PAYPAL_ID = "AcfJvllkdPugefuAMr5kOjWc6nMccIusYV6K-5qyQDwrSb8K33FVWIzsUSiagIAmSjCTWFrcRnmMrI1a"
-PAYPAL_SECRET= "EJRxeikvJ2__LzVhMRE-VZYHzYZIMb8eRINNsJwIwf4x8JJz0bjFa0PjUuiSLzs8XgF28ZlGn7yi_MCS"
-PAYPAL_BASE_URL= 'https://api.sandbox.paypal.com' 
-PAYPAL_RECEIVER_EMAIL = 'sanket.chouriya@oodles.io'
+PAYPAL_ID = (
+    "AcfJvllkdPugefuAMr5kOjWc6nMccIusYV6K-5qyQDwrSb8K33FVWIzsUSiagIAmSjCTWFrcRnmMrI1a"
+)
+PAYPAL_SECRET = (
+    "EJRxeikvJ2__LzVhMRE-VZYHzYZIMb8eRINNsJwIwf4x8JJz0bjFa0PjUuiSLzs8XgF28ZlGn7yi_MCS"
+)
+PAYPAL_BASE_URL = "https://api.sandbox.paypal.com"
+PAYPAL_RECEIVER_EMAIL = "sanket.chouriya@oodles.io"
 PAYPAL_TEST = True
 
 # Calling Logger

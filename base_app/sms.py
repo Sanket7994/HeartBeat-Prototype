@@ -14,6 +14,7 @@ def send_sms_notification_patient(patient, staff_member):
 
     account_sid = settings.TWILIO_ACCOUNT_SID
     auth_token = settings.TWILIO_AUTH_TOKEN
+    
     client = Client(account_sid, auth_token)
     message = client.messages.create(
         messaging_service_sid=settings.TWILIO_MESSAGING_SERVICE_SID,

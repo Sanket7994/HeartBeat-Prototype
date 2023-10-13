@@ -81,19 +81,7 @@ class ClinicStaffSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ClinicMember
-        fields = (
-            "staff_id",
-            "staff_first_name",
-            "staff_last_name",
-            "staff_avatar",
-            "clinic_name",
-            "staff_contact_number",
-            "staff_email",
-            "staff_designation",
-            "shift_type",
-            "staff_status",
-            "created_at",
-        )
+        fields = '__all__'
 
 
 # Task Manager
@@ -121,7 +109,6 @@ class MedicalProceduresTypesSerializer(serializers.ModelSerializer):
 
 # Appointment model serializer
 class AppointmentSerializer(serializers.ModelSerializer):
-    created_at = serializers.ReadOnlyField()
     procedures = serializers.SerializerMethodField()
 
     class Meta:
@@ -159,7 +146,6 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
 # Prescription Information
 class PrescriptionSerializer(serializers.ModelSerializer):
-    created_at = serializers.ReadOnlyField()
 
     class Meta:
         model = Prescription
@@ -190,3 +176,17 @@ class ClientServiceFeedbackSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClientServiceFeedback
         fields = ['customer_id', 'overall_rating', 'comment', 'created_at']
+        
+        
+# Budget     
+class FinancialBudgetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FinancialBudget
+        fields = '__all__'
+  
+        
+class DonationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Donations
+        fields = '__all__'
+  

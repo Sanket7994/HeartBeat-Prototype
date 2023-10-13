@@ -355,7 +355,8 @@
     <script async>
         document.addEventListener("DOMContentLoaded", function () {
             var urlParams = new URLSearchParams(window.location.search);
-            var sessionID = urlParams.get("session_id");
+            var cusId = urlParams.get("cus_id");
+            var sessionId = urlParams.get("session_id");
             const addUserButton = document.querySelector("#confirmFormSubmission");
           
             addUserButton.addEventListener("click", function (event) {
@@ -374,7 +375,8 @@
               }
 
               const feedback = {
-                session_id: sessionID,
+                session_id: sessionId,
+                cus_id: cusId,
                 overall_rating: parseInt(overall_ratingInput.value),
                 comment: comment,
               };

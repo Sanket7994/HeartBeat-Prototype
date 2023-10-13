@@ -15,6 +15,8 @@ admin.site.register(PurchaseOrder)
 admin.site.register(TaskAssignmentManager)
 admin.site.register(PersonalJournal)
 admin.site.register(POPayment)
+admin.site.register(FinancialBudget)
+admin.site.register(Donations)
 
 
 

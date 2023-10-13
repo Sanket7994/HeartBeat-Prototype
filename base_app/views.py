@@ -8,14 +8,17 @@ from .emails import *
 from .sms import *
 from .filter import *
 from .otp_maker import *
-from .helper_functions import *
-from .helper_functions import (DecimalEncoder, dict_to_csv)
+from .helper_functions import (clean_payment_data, apply_pagination, days_diff, 
+                               create_payment_link, dict_to_csv, fetch_master_data,
+                               get_or_create_stripe_customer, fetch_data_and_render_template)
+from .helper_functions import (DecimalEncoder, DatetimeEncoder, convert_string_date_django_datetime_format)
 from .serializer import *
 from .seller_SETTINGS import *
 from .med_seller import *
 from .paginator import CustomPagination
 
 # External REST libraries and models
+import time
 from rest_framework import status
 from rest_framework import permissions
 from rest_framework.views import APIView
@@ -28,7 +31,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 # External Django libraries and modules
-import csv
+
 import json
 import base64
 import requests
@@ -37,7 +40,8 @@ import stripe
 import platform 
 # For executing a shell command
 import subprocess  
-from decimal import Decimal
+from faker import Faker
+from decimal import Decimal, DivisionUndefined
 from django.http import FileResponse
 from datetime import date, timedelta, datetime
 from django.core.exceptions import ObjectDoesNotExist
@@ -46,18 +50,19 @@ from django.views.decorators.cache import cache_page
 from collections import defaultdict, Counter
 from django.dispatch import Signal
 from django.db.models import F
+from django.db.models import Q
 from django.views import View
 from django.db import transaction
 from django.conf import settings
 from django.http import JsonResponse
 from django.http import HttpResponse
+from django.core.cache import cache 
 from django.core.paginator import Paginator
 from django.core.exceptions import ObjectDoesNotExist
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.encoding import force_bytes
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.tokens import default_token_generator
 from django.template.loader import render_to_string
@@ -590,6 +595,7 @@ class ClinicListView(APIView):
             payload = {
                 "Page": {
                     "totalRecords": paginator.get_total_items(queryset),
+                    
                     "current": paginator.get_page(request),
                     "totalPages": paginator.calculate_total_pages(
                         paginator.get_total_items(queryset),
@@ -653,7 +659,6 @@ class StaffRelationshipManagementView(APIView):
     def get(self, request, *args, **kwargs):
         try:
             queryset = ClinicMember.objects.all().order_by("-created_at")
-
             # Setting up filter parameters for search results
             filter_params = {
                 "clinic_name": self.request.GET.get("clinic_name"),
@@ -795,7 +800,7 @@ class TaskManager(APIView):
                     sub_tasks.append({"task": task, "status": "Pending"})
                     
                 task_thread = [{"log": "A new assignment has been created", 
-                               "timestamp": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), 
+                               "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"), 
                                "user_id": assignor_value}]
                     
                 data = {"task_title": request.data.get("task_title"),
@@ -890,7 +895,7 @@ class TaskManager(APIView):
             # Determine updated task status
             if completed_task_count == len(fetched_data["sub_tasks"]):
                 updated_task_status = "COMPLETED"
-            elif datetime.datetime.strptime(str(queryset.set_deadline), "%Y-%m-%d") < datetime.datetime.now():
+            elif datetime.strptime(str(queryset.set_deadline), "%Y-%m-%d") < datetime.now():
                 updated_task_status = "OVERDUE"
             else:
                 updated_task_status = "PENDING"
@@ -1053,7 +1058,7 @@ class PersonalJournalView(APIView):
             updated_checklist = json.dumps(fetched_checklist, cls=DatetimeEncoder)
                 
         # Updating edit timeline 
-        new_edit_timeline = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        new_edit_timeline = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         loaded_meta_edit_timeline = json.loads(queryset.edit_timeline)
         loaded_meta_edit_timeline.append(new_edit_timeline)
         
@@ -1083,43 +1088,73 @@ class AppointmentManagement(APIView):
 
     # Create a new Appointment
     def post(self, request):
-        try:
-            data = {
-            "clinic_name": request.data.get("clinic_name"),
-            "relatedDepartment": request.data.get("relatedDepartment"),
-            "relatedRecipient": request.data.get("relatedRecipient"),
-            "patient_first_name": request.data.get("patient_first_name"),
-            "patient_last_name": request.data.get("patient_social_security_ID"),
-            "patient_social_security_ID": request.data.get("patient_last_name"),
-            "patient_gender": request.data.get("patient_gender"),
-            "patient_contact_number": request.data.get("patient_contact_number"),
-            "patient_email": request.data.get("patient_email"),
-            "recurring_patient": request.data.get("recurring_patient"),
-            "appointment_date": request.data.get("appointment_date"),
-            "appointment_slot": request.data.get("appointment_slot"),
-            "status": request.data.get("status"),
-            "procedures": request.data.get("procedures"),}
+        # Using request.body first to avoid django.http.request.RawPostDataException 
+        # Request.body is being used by the faker data generator in json str/bytes data type 
+        fetched_body = request.body
+        # Request.data is being fetched by direct API credentials which is normally dict type
+        fetched_data = request.data
+
+        if isinstance(fetched_body, bytes):
+            try:
+                loaded_queryset = json.loads(json.loads(fetched_body))
+            except json.JSONDecodeError:
+                return Response({"error": "Invalid JSON data provided"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        elif isinstance(fetched_data, dict):
+            loaded_queryset = {
+            "clinic_name": fetched_data.get("clinic_name"),
+            "relatedRecipient": fetched_data.get("relatedRecipient"), 
+            "patient_first_name": fetched_data.get("patient_first_name"),
+            "patient_last_name": fetched_data.get("patient_social_security_ID"),
+            "patient_social_security_ID": fetched_data.get("patient_last_name"),
+            "patient_gender": fetched_data.get("patient_gender"),
+            "date_of_birth": fetched_data.get("date_of_birth"),
+            "patient_consent_agreement": fetched_data.get("patient_consent_agreement"),
+            "patient_contact_number": fetched_data.get("patient_contact_number"),
+            "patient_email": fetched_data.get("patient_email"),
+            "recurring_patient": fetched_data.get("recurring_patient"),
+            "appointment_date": fetched_data.get("appointment_date"),
+            "appointment_slot": fetched_data.get("appointment_slot"),
+            "appointment_status": fetched_data.get("appointment_status"),
+            "procedures": fetched_data.get("procedures")}
 
             # Fetching data
-            queryset = ClinicMember.objects.filter(staff_id=data.get("relatedRecipient")).values(
+            queryset = ClinicMember.objects.filter(staff_id=loaded_queryset.get("relatedRecipient")).values(
                 "staff_first_name", "staff_last_name", "staff_email", "staff_contact_number"
             ).first()
 
             # Sending Email Notifications
             send_email_notification_to_staff(queryset)
-            send_email_notification_to_patient(data, queryset)
+            send_email_notification_to_patient(loaded_queryset, queryset)
             log.info("Appointment creation notification email sent to both client and consultant.")
 
             # Sending SMS Notifications
             send_sms_notification_staff_member(queryset)
-            send_sms_notification_patient(data, queryset)
+            send_sms_notification_patient(loaded_queryset, queryset)
             log.info("Appointment creation notification SMS sent to both client and consultant.")
             
-            serializer = AppointmentSerializer(data=data)
+        else:
+            return Response({"error": "Invalid data provided"}, status=status.HTTP_406_NOT_ACCEPTABLE) 
+        try:
+            # Deserialize the data into an AppointmentSerializer
+            serializer = AppointmentSerializer(data=loaded_queryset)
+
             if serializer.is_valid():
-                serializer.save()
-                
-                log.info("Appointment with ID %s created", serializer.appointment_id)
+                # Save the serializer, creating a new appointment if it doesn't exist
+                appointment_instance = serializer.save()
+
+                if appointment_instance.procedures.count() == 0:
+                    total_cost = 0
+                    for procedure_name in loaded_queryset["procedures"]:
+                        procedures = MedicalProceduresTypes.objects.filter(procedure_choice=procedure_name)
+                        # Adding procedure_choice
+                        appointment_instance.procedures.add(*procedures)
+                        # Adding its fee
+                        meta_data = procedures.values("fixed_cost").first()
+                        total_cost += Decimal(meta_data["fixed_cost"])
+                        
+                appointment_instance.total_procedure_cost = total_cost.quantize(Decimal("0.00"))
+                log.info("New Appointment has been created")
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             
             log.critical(str(serializer.errors))
@@ -1134,8 +1169,8 @@ class AppointmentManagement(APIView):
         try:
             if appointment_id is None:
                 log.info("View all appointment data API triggered.")
-                queryset = queryset = PatientAppointment.objects.all().order_by("-created_at")
-                
+                queryset = PatientAppointment.objects.all().order_by("-created_at")
+
                 # filter and Search function for list
                 filter_params = {
                     "appointment_id": self.request.GET.get("appointment_id"),
@@ -1297,30 +1332,61 @@ class ClientDataManagement(APIView):
             for client in queryset.values():
                 transactions_details = client.get("transactions_made", {})
                 if transactions_details:
-                    for data in transactions_details:
+                    try:
+                        transactions_data = json.loads(transactions_details)
+                    except Exception:
+                        transactions_data = transactions_details
+                    for data in transactions_data:
                         if data["stripe_payment_status"] == 'paid':
                             date_list.append(str(data["payment_due_date"]))
                             date_list.append(str(data["session_created_on"]))
                     else:
                         continue
 
-            # Getting total due amount
-            total_due_amount = Prescription.get_total_due_amount()
+            # stats
+            total_patients_treated = Prescription.total_patients_treated()
+            active_patients_data = Prescription.get_total_unique_active_patients_with_age_gender_distribution()
+            paid_prescriptions = len(Prescription.objects.filter(payment_status="PAID").values())
+            active_patients_count = active_patients_data["total_unique_active_patients"]
+            patient_age_distribution = {
+                "Children_distribution": active_patients_data["Children_distribution"], 
+                "Teenagers_distribution": active_patients_data["Teenagers_distribution"], 
+                "Adults_distribution": active_patients_data["Adults_distribution"]
+                }
+            patientGenderStats = {
+                "Male_distribution": active_patients_data["Male_distribution"], 
+                "Female_distribution": active_patients_data["Female_distribution"], 
+                "Undisclosed_distribution": active_patients_data["Undisclosed_distribution"]
+                }
+            totalProcedureAmount = PatientAppointment.get_total_procedure_amount()
+            totalAppointmentFees = Decimal(len(PatientAppointment.objects.values()) * 100).quantize(Decimal('0.00'))
+            totalPrescriptionMedAmount = Prescription.get_total_due_amount()
 
             # Total prescription and appointments created for patients
             prescriptionCount = sum(int(prescription["prescription_count"]) for prescription in payload["Result"])
             appointmentCount = sum(int(appointment["appointment_count"]) for appointment in payload["Result"])
             totalBilling = sum(Decimal(revenue["total_billings"]) for revenue in payload["Result"])
             avg_payment_credit_time =  sum(days_diff(a, b) for a, b in zip(date_list, date_list[1:])) // (len(date_list) - 1)
-            averageBilling = totalBilling / Decimal(len(payload["Result"]))
-
+            
+            if Decimal(paid_prescriptions) != 0:
+                averageBilling = totalBilling / Decimal(paid_prescriptions)
+            else:
+                averageBilling = 0
+            
             # Adding a nest in the dictionary for respective variable
             payload["Dashboard_stats"] = {
                 "total_medical_procedure_count": medProceduresCount,
                 "total_prescriptions_created": prescriptionCount,
                 "total_appointment_handled": appointmentCount,
-                "total_due_amount": Decimal(total_due_amount - totalBilling).quantize(Decimal('0.00')),
-                "total_revenue_generated": totalBilling,
+                "active_patients_count": active_patients_count,
+                "total_patients_treated": total_patients_treated,
+                "patients_gender_distribution": patientGenderStats,
+                "patients_age_distribution": patient_age_distribution,
+                "total_pending_payment_amount": {"total_appointment_fee_collected": totalAppointmentFees, 
+                                                 "total_procedure_fee_collected": totalProcedureAmount,
+                                                 "total_prescription_med_fee_collected": totalPrescriptionMedAmount,
+                                                 "total": (totalAppointmentFees + totalPrescriptionMedAmount + totalProcedureAmount)},
+                "total_payment_revenue": totalBilling,
                 "average_patient_treatment_cost": averageBilling,
                 "avg_payment_credit_time": abs(round(avg_payment_credit_time, 2)),
             }
@@ -1348,10 +1414,10 @@ class PharmacyInventoryManagement(APIView):
                 log.info("New Drug added successfully")
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             log.critical(serializer.errors)
-            return Response({"detail": "Invalid data provided.", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             log.error(str(e))
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST,)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
     # View Drug List
     def get(self, request, drug_id=None, *args, **kwargs):
@@ -1359,6 +1425,11 @@ class PharmacyInventoryManagement(APIView):
             if drug_id == 'None':
                 drug_id = None
             queryset = PharmacyInventory.objects.all().order_by("-added_at")
+            
+            a_queryset = PatientAppointment.objects.all().order_by("-created_at")
+            drug_list = []
+            for inventory_item in a_queryset:
+                drug_list.append(inventory_item.appointment_id)
             
             if drug_id is not None:
                 queryset = queryset.filter(drug_id=drug_id)
@@ -1545,25 +1616,26 @@ class SendBatchPurchaseRequest(APIView):
     
     def add_new_product_to_inventory(self, queryset):
         try:
-            product_id = queryset.get("drug_id")
-            product_data = stripe.Product.retrieve(product_id)
+            drug_id = queryset.get("drug_id")
+            product_data = stripe.Product.retrieve(drug_id)
             final_payload = json.dumps(extract_product_data(product_data), cls=DecimalEncoder)
             # URL of your Django post view
-            base_url = settings.YOUR_DOMAIN
-            post_view_url = f"{base_url}/pharmacy/inventory/add/"
-            headers = {
-                "Content-Type": "application/json"
-                }
+            post_view_url = f"{settings.YOUR_DOMAIN}/pharmacy/inventory/add/"
+            headers = {"Content-Type": "application/json"}
             response = requests.post(post_view_url, data=final_payload, headers=headers)
             return response
         except Exception as e:
             print(e)
             return None
         
-    def fetch_product_data_from_stripe(self, product_id):
+    def fetch_product_data_from_stripe(self, drug_id=None, seller_product_id=None):
         stripe.api_key = STRIPE_SECRET_KEY
+        if drug_id:
+            target_id = drug_id
+        else:
+            target_id = seller_product_id
         try:
-            product_data = stripe.Product.retrieve(str(product_id))
+            product_data = stripe.Product.retrieve(str(target_id))
             final_payload = extract_product_data(product_data)
             response = self.add_new_product_to_inventory(final_payload)
             
@@ -1577,15 +1649,17 @@ class SendBatchPurchaseRequest(APIView):
                 log.debug("Error Code %s: New product didn`t added to inventory", response.status_code)
                 return None
         except stripe.error.InvalidRequestError as stripe_error:
-            log.error(f"Stripe API error: {stripe_error}")
-            return None
+            log.debug("Error Code %s: stripe.error.InvalidRequestError", response.status_code)
+            return Response({"error": str(stripe_error)}, status=status.HTTP_400_BAD_REQUEST)
+    
         except Exception as e:
             log.exception("Error: {e}")
-            return None
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def get_pharmacy_inventory(self, queryset):
         drug_name = queryset.get("drugName")
         drug_id = queryset.get("drugId")
+        seller_product_id = queryset.get("seller_productId")
         try:
             product = PharmacyInventory.objects.filter(drug_id=drug_id).values().first()
             if product:
@@ -1595,7 +1669,7 @@ class SendBatchPurchaseRequest(APIView):
             if product:
                 return product
             else:
-                data = self.fetch_product_data_from_stripe(drug_id)
+                data = self.fetch_product_data_from_stripe(drug_id, seller_product_id)
                 if data:
                     return data
                 else:
@@ -1604,8 +1678,7 @@ class SendBatchPurchaseRequest(APIView):
         except Exception as e:
             error_code = str(e)
             return Response({"error": error_code}, status=status.HTTP_404_NOT_FOUND)
-
-                
+        
     def update_thread_history(self, purchase_order, new_thread):
         meta_thread_history = json.loads(purchase_order.thread_history)
         meta_thread_history.append(new_thread)
@@ -1631,7 +1704,6 @@ class SendBatchPurchaseRequest(APIView):
             
             elif authorized_by == "NA":
                 purchase_order = serializer.save()
-                print(type(purchase_order))
                 new_thread = {
                     "log": "Purchase Order has been updated successfully.",
                     "user_id": created_by,
@@ -1642,16 +1714,17 @@ class SendBatchPurchaseRequest(APIView):
                 file_path = dict_to_csv(structured_data, filename)
                 purchase_order.PO_report.save(filename, open(file_path, 'rb'))
                 log.info("PO Updated successfully")
+                purchase_order.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
                 
             elif "SA-" in authorized_by and status_data == "APPROVED":
                 purchase_order = serializer.save()
-                purchase_order.approval_status = PurchaseOrder.StatusCode.APPROVED
+                purchase_order.approval_status = StatusCode.APPROVED
                 purchase_order.authorized_by = authorized_by
                 new_thread = {
                     "log": "Purchase Order has been accepted \n& Ready for Payment.",
                     "user_id": authorized_by,
-                    "timestamp": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                 }
                 self.update_thread_history(purchase_order, new_thread)
                 filename = f'revised_{purchase_order.purchase_order_id}.csv'
@@ -1675,7 +1748,6 @@ class SendBatchPurchaseRequest(APIView):
     # Cache the view for 15 minutes 
     def put(self, request, purchase_order_id, *args, **kwargs):
         purchase_order = self.get_purchase_order(purchase_order_id)
-        print(type(purchase_order))
         if not purchase_order:
             return Response({"error": "Batch Purchase Order not found."}, status=status.HTTP_404_NOT_FOUND)
         
@@ -1695,12 +1767,13 @@ class SendBatchPurchaseRequest(APIView):
         structured_data = []
         for drug in order_data:
             drug_id = drug.get("drugId")
-            print(drug_id)
+            drug_name = drug.get("drugName")
             drug_info = self.get_pharmacy_inventory(drug)
             if not drug_info:
                 return Response({"error": f"Drug with ID {drug_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
             drug["drugURL"] = drug_info["drug_image_url"]
-            drug["priceId"] = fetch_stripe_price_id(drug_id)
+            drug["seller_productId"] = fetch_seller_product_id(drug_name)
+            drug["priceId"] = fetch_stripe_price_id(drug_id, drug["seller_productId"])
             structured_data.append(drug)
         return self.update_purchase_order(purchase_order, created_by, approval_status_data, authorized_by, structured_data, thread_data)
 
@@ -1779,35 +1852,56 @@ class PrescriptionManagement(APIView):
 
     # Add Prescription
     def post(self, request):
-        data = {
-            "clinic_name": request.data.get("clinic_name"),
-            "consultant": request.data.get("consultant"),
+        fetched_body = request.body
+        # Request.data is being fetched by direct API credentials which is normally dict type
+        fetched_data = request.data
+
+        if isinstance(fetched_body, bytes):
+            try:
+                loaded_queryset = json.loads(json.loads(fetched_body))
+            except json.JSONDecodeError:
+                return Response({"error": "Invalid JSON data provided"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        elif isinstance(fetched_data, dict):
+            loaded_queryset = {
             "appointment_id": request.data.get("appointment_id"),
             "medications_json": request.data.get("medications_json"),
             "shipping_address": request.data.get("shipping_address"),
             "coupon_discount": request.data.get("coupon_discount"),
-            "description": request.data.get("description")}
+            "description": request.data.get("description"),
+            "created_at": request.data.get("created_at"),}
         
-        updated_medications_json = []
+        updated_medications_json = {}
         try:
             log.debug("Medications data fetching")
-            for med in data.get("medications_json", []):
-                quantity = med.get('quantity')
-                drug_id = med.get('drug_id')
-                dosage_freq = med.get('dosage_freq')
+            for med in loaded_queryset["medications_json"]:
+                quantity = med['quantity']
+                drug_id = med['drug_id']
+                dosage_freq = med['dosage_freq']
                 verified_data = PharmacyInventory.objects.get(drug_id=drug_id)
-                medication = {
-                    "medicine_id": verified_data.drug_id,
-                    "medicine_name": verified_data.drug_name,
-                    "purpose": verified_data.drug_class,
-                    "quantity": quantity,
-                    "amount_per_unit": verified_data.price,
-                    "total_payable_amount": Decimal(float(verified_data) * float(quantity)).quantize(Decimal('0.00')),
-                    "stripe_price_id": verified_data.stripe_price_id,
-                    "dosage_freq": dosage_freq
-                }
-                updated_medications_json.append(medication)
                 
+                if drug_id in updated_medications_json:
+                    # If the drug_id is already in the dictionary, add the quantity
+                    updated_medications_json[drug_id]['quantity'] += quantity
+                    # Calculate the new total_payable_amount
+                    updated_medications_json[drug_id]['total_payable_amount'] += Decimal(float(verified_data.price) * float(quantity)).quantize(Decimal('0.00'))
+                else:
+                    # If the drug_id is not in the dictionary, create a new entry
+                    medication = {
+                        "medicine_id": verified_data.drug_id,
+                        "medicine_name": verified_data.drug_name,
+                        "purpose": verified_data.drug_class,
+                        "quantity": quantity,
+                        "amount_per_unit": verified_data.price,
+                        "total_payable_amount": Decimal(float(verified_data.price) * float(quantity)).quantize(Decimal('0.00')),
+                        "stripe_price_id": verified_data.stripe_price_id,
+                        "dosage_freq": dosage_freq
+                    }
+                    updated_medications_json[drug_id] = medication
+
+            # Convert the dictionary back to a list
+            updated_medications_json = list(updated_medications_json.values())
+
         except PharmacyInventory.DoesNotExist as p:
             log.warning("Invalid Drug ID provided")
             return Response({"error": "PharmacyInventory with drug_id {} does not exist.".format(drug_id)}, 
@@ -1817,14 +1911,14 @@ class PrescriptionManagement(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
         # Converting nested list to valid json format
-        data["medications_json"] = json.dumps(updated_medications_json, cls=DecimalEncoder)
+        loaded_queryset["medications_json"] = json.dumps(updated_medications_json, cls=DecimalEncoder)
         
         # validate shipping address
-        verified_address = validate_address(data["shipping_address"])
-        data["shipping_address"] = json.dumps(verified_address)
+        verified_address = validate_address(loaded_queryset["shipping_address"][0])
+        loaded_queryset["shipping_address"] = json.dumps(verified_address)
   
         # Finally validating through serializer
-        serializer = PrescriptionSerializer(data=data)
+        serializer = PrescriptionSerializer(data=loaded_queryset)
         if serializer.is_valid():
             serializer.save()
             log.info("New PID %s created successfully", serializer.data["prescription_id"])
@@ -1837,7 +1931,7 @@ class PrescriptionManagement(APIView):
     def get(self, request, *args, **kwargs):
         try:
             queryset = Prescription.objects.all().order_by("-created_at")
-
+            
             # filter and Search function for list
             filter_params = {
                 "prescription_id": self.request.GET.get("prescription_id"),
@@ -1864,7 +1958,12 @@ class PrescriptionManagement(APIView):
             # Use GET instead of data to retrieve the page number
             page_obj = paginator.get_page(page_number)
             serializer = PrescriptionSerializer(page_obj, many=True)
-
+            
+            for prescription in serializer.data:
+                prescription_id = prescription["prescription_id"]
+                gender = Prescription.get_customer_data(prescription_id)
+                prescription["client_gender"] = gender
+            
             # result dictionary
             payload = {
                 "Page": {
@@ -1971,7 +2070,7 @@ class PrescriptionPaymentCheckoutSessionView(APIView):
             send_pay_link_via_email(prescription_dict, payment_url)
             log.info("Payment link shared with the client via email")
 
-            return Response({"sessionId": checkout_session.id})
+            return Response({"sessionId": checkout_session.id, "payment_link": payment_url})
         #error handling
         except stripe.error.StripeError as e:
             log.error(str(e))
@@ -1979,7 +2078,6 @@ class PrescriptionPaymentCheckoutSessionView(APIView):
         except Exception as e:
             log.error(str(e))
             return Response(data={"Internal error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 
 # Success View
@@ -1999,20 +2097,21 @@ class SuccessPaymentView(View):
                 'prescription_id': cleaned_session_data["client_reference_id"],
                 'session_id': cleaned_session_data["id"],
                 'payment_intent': cleaned_session_data["payment_intent"],
+                'bill_amount': Decimal((int(cleaned_session_data["amount_total"])/100)).quantize(Decimal('0.00')),
                 'payment_method': cleaned_session_data["payment_method_types"][0],
                 'client_billing_address': json.loads(json.dumps(cleaned_session_data["customer_details"]["address"])),
                 'stripe_session_status': cleaned_session_data["status"],
                 'stripe_payment_status': cleaned_session_data["payment_status"],
-                'session_created_on': datetime.datetime.fromtimestamp(cleaned_session_data["created"]).strftime("%d-%m-%Y %H:%M:%S"),
-                'session_expired_on': datetime.datetime.fromtimestamp(cleaned_session_data["expires_at"]).strftime("%d-%m-%Y %H:%M:%S"),
+                'session_created_on': datetime.fromtimestamp(cleaned_session_data["created"]).strftime("%d-%m-%Y %H:%M:%S"),
+                'session_expired_on': datetime.fromtimestamp(cleaned_session_data["expires_at"]).strftime("%d-%m-%Y %H:%M:%S"),
             }
 
             with transaction.atomic():
                 prescription_id = cleaned_data["prescription_id"]
                 try:
                     prescription = Prescription.objects.get(prescription_id=prescription_id)
-                    timestamp = prescription["created_at"]
-                    datetime_obj = datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                    timestamp = prescription.created_at
+                    datetime_obj = datetime.strptime(str(timestamp), "%Y-%m-%d %H:%M:%S")
                     formatted_datetime = datetime_obj.strftime("%d-%m-%Y %H:%M:%S")
                     cleaned_data["payment_due_date"] = formatted_datetime
                 except Prescription.DoesNotExist:
@@ -2022,9 +2121,11 @@ class SuccessPaymentView(View):
                     # Update billing address and customer ID in the related client object
                     client = ClientDataCollectionPool.objects.get(stripe_customer_id=cleaned_session_data["customer"])
                     client.client_billing_address = cleaned_data["client_billing_address"]
-                    client.transactions_made.append(cleaned_data)
-                    client.total_billings = Decimal(float(client.total_billings) + float(prescription.grand_total)
-                                                    ).quantize(Decimal('0.00'))
+                    transaction_data = client.transactions_made
+                    transaction_data.append(cleaned_data)
+                    client.transactions_made = json.dumps(transaction_data, cls=DecimalEncoder)
+                    client.total_billings = Decimal(float(client.total_billings) 
+                                                    + float(cleaned_data['bill_amount'])).quantize(Decimal('0.00'))
                     client.save()
 
                     # Save the payment data
@@ -2067,24 +2168,40 @@ class CustomerFeedbackView(APIView):
     def post(self, request, *args, **kwargs):
         try:
             data = {
+                "cus_id": request.data.get("cus_id"),
                 "session_id": request.data.get("session_id"),
                 "overall_rating": request.data.get("overall_rating"),
                 "comment": request.data.get("comment"),}
             
             if data["session_id"] is not None:
-                session_data = stripe.checkout.Session.retrieve(data["session_id"])
+                session_id = data["session_id"]
+                try:
+                    session_data = stripe.checkout.Session.retrieve(session_id)
+                    # adding customer id to data 
+                    data["customer_id"] = str(session_data["customer"])
+                    # Deleting session Id as its not necessary
+                    del data['session_id']
+                    
+                    serializer = ClientServiceFeedbackSerializer(data=data, partial=True)
+                    serializer.is_valid(raise_exception=True)
+                    serializer.save()
+                    log.info("CID %s has submitted his feedback successfully", data["customer_id"])
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+                except ValueError as v:
+                    log.error(v)
+                    # Get the customer data or return a 404 response if not found.
+                    customer_id = data["cus_id"]
+                    customer_data = get_object_or_404(ClientDataCollectionPool, stripe_customer_id=customer_id)
+                    # Deleting session Id as its not necessary
+                    del data['session_id']
+                    
+                    # Initialize the serializer and save the data in one step.
+                    serializer = ClientServiceFeedbackSerializer(customer_data, data=data, partial=True)
+                    serializer.is_valid(raise_exception=True)
+                    serializer.save()
+                    
+                    log.info("CID %s has submitted their feedback successfully", customer_id)
                 
-                # adding customer id to data 
-                data["customer_id"] = str(session_data["customer"])
-                # Deleting session Id as its not necessary
-                del data['session_id']
-                
-                serializer = ClientServiceFeedbackSerializer(data=data, partial=True)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
-                log.info("CID %s has submitted his feedback successfully", data["customer_id"])
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
             log.warning("Unable to retrieve Session ID")
             raise ValueError("Session ID is not available")
         
@@ -2140,7 +2257,6 @@ class CustomerFeedbackView(APIView):
             log.error(str(e))
             return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
-
 # Cancel Response View
 class CancelPaymentView(View):
     def get(self, request):
@@ -2149,6 +2265,286 @@ class CancelPaymentView(View):
         return HttpResponse(html_content)
 
 
-
 ############################################################################################################################
 
+# Budget Planning
+class FinancialBudgetView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    # CREATE 
+    def post(self, request, *args, **kwargs):
+        try:
+            data = {
+                "created_by": request.data.get("created_by"),
+                "budget_title": request.data.get("budget_title"),
+                "budget_period_type": request.data.get("budget_period_type"),
+                "start_date": request.data.get("start_date"),
+                "end_date": request.data.get("end_date"),
+                "set_amount": request.data.get("set_amount"),
+            }
+            
+            try:
+                user_data = CustomUser.objects.filter(id = data["created_by"]).values().first()
+            except ObjectDoesNotExist:
+                log.warning("User with id %s does not exist", data["created_by"])
+                return Response({"error": "User profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            serializer = FinancialBudgetSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                log.info("New plan added successfully")
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            log.critical(serializer.errors)
+            return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            log.error(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # VIEW
+    def get(self, request, *args, **kwargs):
+        try:
+            queryset = FinancialBudget.objects.all().order_by("start_date")
+            # Filter by query parameters
+            budget_id = self.request.GET.get("budget_id")
+            created_by = self.request.GET.get("created_by")
+            if created_by:
+                queryset = queryset.filter(created_by__icontains=created_by)
+            if budget_id:
+                queryset = queryset.filter(id=budget_id)
+            # Applying pagination
+            set_limit = int(self.request.GET.get("limit"))
+            paginator = Paginator(queryset, set_limit)
+            page_number = int(self.request.GET.get("page"))
+            # Use GET instead of data to retrieve the page number
+            page_obj = paginator.get_page(page_number)
+            serializer = FinancialBudgetSerializer(page_obj, many=True)
+
+            # result dictionary
+            payload = {
+                "Page": {
+                    "totalRecords": queryset.count(),
+                    "current": page_obj.number,
+                    "next": page_obj.has_next(),
+                    "previous": page_obj.has_previous(),
+                    "totalPages": page_obj.paginator.num_pages,
+                },
+                "Result": serializer.data
+                ,
+            }
+            log.info("All Budget plan Data fetched Successfully")
+            return Response(payload, status=status.HTTP_200_OK,)
+        except Exception as e:
+            log.error(str(e))
+            return Response(data={"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Financial Data collection
+
+class BudgetEvaluation(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_user_data(self, user_id):
+        try:
+            user_data = CustomUser.objects.filter(id=user_id).values().first()
+            return user_data
+        except ObjectDoesNotExist:
+            log.warning("User with id %s does not exist", user_id)
+            return Response({"error": "User profile not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+    def validate_and_update_financial_budget(self, fetched_budget_id):
+        try:
+            budgetData = FinancialBudget.objects.get(budget_id=fetched_budget_id)
+            evaluation_status = bool(budgetData.approved_by)
+            updates = {"evaluation_status": evaluation_status}
+            serializer = FinancialBudgetSerializer(budgetData, data=updates, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        except FinancialBudget.DoesNotExist:
+            return Response({'error': "Budget ID not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': "Failed to update evaluation status"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def apply_daterange_filter(self, model, serializer, object_data, date_field):
+        queryset = model.objects.all().order_by(date_field)
+        serialized_data = serializer(queryset, many=True)
+        normalized_data = json.loads(json.dumps(serialized_data.data, cls=DatetimeEncoder))
+        # Convert start_date and end_date to timezone-aware datetime objects
+        start_date = timezone.datetime.strptime(str(object_data["start_date"]), "%Y-%m-%d")
+        end_date = timezone.datetime.strptime(str(object_data["end_date"]), "%Y-%m-%d")
+        try:
+            filtered_results = [
+                object for object in normalized_data
+                if start_date <= datetime.strptime(object[date_field], "%Y-%m-%d %H:%M:%S.%f") <= end_date]
+        except Exception as e:
+            log.info(f"Exception Case triggered: {e}")
+            filtered_results = [object for object in normalized_data 
+                                if start_date <= convert_string_date_django_datetime_format(object[date_field]) <= end_date]
+        return filtered_results
+                 
+    def filter_paid_prescription(self, filtered_data, sub_field):
+        paid_results = [data for data in filtered_data if data[sub_field] == "PAID"]
+        return paid_results
+               
+    def filter_paid_appointments(self, filtered_data, sub_field):
+        paid_procedure_data = []
+        appointment_list = [data[sub_field] for data in filtered_data]
+        for element in appointment_list:
+            object = PatientAppointment.objects.filter(appointment_id=element).values().first()
+            paid_procedure_data.append(object)
+        return paid_procedure_data
+        
+    def get_total_amount(self, model_data, field):
+        if len(model_data) != 0:
+            try:
+                total_income = model_data.aggregate(total_income=Sum(field))['total_income']
+                return total_income or Decimal('0.00')
+            except AttributeError as e:
+                log.info(f"Exception Case triggered: {e}")
+                total_income = sum(Decimal(obj[field]) for obj in model_data)
+                return total_income or Decimal('0.00')
+        return Decimal('0.00')
+            
+    def get_distribution_ratio(self, total, sub_total):
+        if sub_total != 0 and total != 0:
+            ratio = Decimal((sub_total / total) * 100)
+            return round(ratio, 1) 
+        return Decimal('0.0')
+
+    def calculate_margin_rate(self, revenue, expenditure):
+        if revenue != 0:
+            return round(((revenue - expenditure) / revenue) * 100, 2)
+        return Decimal('0.00')
+        
+    def evaluate_financial_data(self, budget_object): 
+        # Filter the prescription model
+        prescription_data = self.apply_daterange_filter(Prescription, PrescriptionSerializer, budget_object, 'created_at')
+        paid_prescription_data = self.filter_paid_prescription(prescription_data, 'payment_status')
+        med_prescription_fee = self.get_total_amount(paid_prescription_data, "med_bill_amount")
+        patient_appointment_fee = Decimal(len(paid_prescription_data) * 100)  
+        # Filter the PatientAppointment model with the date range
+        paid_appointment_data = self.filter_paid_appointments(paid_prescription_data, 'appointment_id')
+        med_procedure_fee = self.get_total_amount(paid_appointment_data, "total_procedure_cost")
+        # We will assure that Hospital received donation which 5%-10% of the total budget
+        # Also set limit for received donation is 6 which can be modified
+        donation_data = self.apply_daterange_filter(Donations, DonationSerializer, budget_object, 'donation_date')
+        donation_income = self.get_total_amount(donation_data, "donation_amount")
+        # Employee salary
+        employee_data = ClinicMember.objects.all()
+        aggregate_emp_salary = self.get_total_amount(employee_data, "staff_fixed_salary")
+        # Pharmacy Purchase Orders
+        purchase_order_data = self.apply_daterange_filter(PurchaseOrder, PurchaseOrderSerializer, budget_object, 'request_sent_at')
+        po_expense_amount = self.get_total_amount(purchase_order_data, "total_payment_amount")
+        # Assuming Facility cost would be 20-30% of the total budget
+        facility_costs = Decimal(float(budget_object["set_amount"]) * 0.25)
+        # Final Stats
+        final_total_revenue = sum([
+            patient_appointment_fee, 
+            med_procedure_fee, 
+            med_prescription_fee, 
+            donation_income
+        ])
+        final_total_expenditure = sum([
+            aggregate_emp_salary, 
+            po_expense_amount, 
+            facility_costs
+        ])
+        margin_rate = self.calculate_margin_rate(final_total_revenue, final_total_expenditure)
+        # Final Payload
+        payload = {
+            "budget_data": {"budget_id": budget_object["budget_id"],
+                          "budget_title": budget_object["budget_title"],
+                          "start_date": budget_object["start_date"],
+                          "end_date": budget_object["end_date"],
+                          "set_amount": budget_object["set_amount"]},
+            "revenue_data": {
+                "appointment_revenue": patient_appointment_fee,
+                "appointment_ratio": self.get_distribution_ratio(final_total_revenue, patient_appointment_fee),
+                "med_prescription_revenue": med_prescription_fee,
+                "med_prescription_ratio": self.get_distribution_ratio(final_total_revenue, med_prescription_fee),
+                "med_procedure_revenue": med_procedure_fee,
+                "med_procedure_ratio": self.get_distribution_ratio(final_total_revenue, med_procedure_fee),
+                "donation": donation_income,
+                "donation_ratio": self.get_distribution_ratio(final_total_revenue, donation_income),
+                "total_revenue": final_total_revenue,
+            },
+            "expenditure_data": {
+                "emp_salary": aggregate_emp_salary,
+                "emp_salary_ratio": self.get_distribution_ratio(final_total_expenditure, aggregate_emp_salary),
+                "po_expense": po_expense_amount,
+                "po_expense_ratio": self.get_distribution_ratio(final_total_expenditure, po_expense_amount),
+                "facility_costs": facility_costs,
+                "facility_cost_ratio": self.get_distribution_ratio(final_total_expenditure, facility_costs),
+                "total_expenditure": final_total_expenditure
+            },
+            "margin_rate": str(margin_rate)}
+        return payload
+        
+    def default_payload(self, fetched_budget_id):
+        return {
+            "budget_id": fetched_budget_id,
+            "revenue_data": {
+                "appointment_revenue": 0.00,
+                "appointment_ratio": 0.00,
+                "med_prescription_revenue": 0.00,
+                "med_prescription_ratio": 0.00,
+                "med_procedure_revenue": 0.00,
+                "med_procedure_ratio": 0.00,
+                "donation": 0.00,
+                "donation_ratio": 0.00,
+                "total_revenue": 0.00,
+            },
+            "expenditure_data": {
+                "emp_salary": 0.00,
+                "emp_salary_ratio": 0.00,
+                "po_expense_ratio": 0.00,
+                "po_expense_ratio": 0.00,
+                "facility_costs": 0.00,
+                "facility_cost_ratio": 0.00,
+                "total_expenditure": 0.00,
+            },
+            "margin_rate": str(0.00),
+            "approved_by": api_data["approved_by"],
+        }    
+        
+    # CREATE THE BUDGET EVALUATION REPORT
+    def get(self, request, budget_id, *args, **kwargs):
+        try:
+            start_time = time.time()
+            if budget_id is not None: 
+                fetched_budget_id = budget_id
+                # Update evaluation status as its been approved
+                budget_instance = self.validate_and_update_financial_budget(fetched_budget_id)
+                # if response status is 200 then only provide financial evaluation data
+                if budget_instance.status_code == 200:
+                    verified_budget_object = FinancialBudget.objects.filter(budget_id=fetched_budget_id).values().first()
+                    payload = self.evaluate_financial_data(verified_budget_object)
+                    # Saving the data in cache 15 mins
+                    cache.set(f"fetched_budget_{fetched_budget_id}", payload, 60*15)
+                    # finally Checking function runtime
+                    end_time = time.time()
+                    elapsed_time = end_time - start_time
+                    log.info(f"Financial Evaluation of completed in {elapsed_time:.3f} seconds")
+                    return Response(payload, status=status.HTTP_200_OK)
+                payload = self.default_payload(fetched_budget_id)
+                log.warning(f"Financial Evaluation Incomplete due to unapproved Budget Plan")
+                log.info(f"Process Timeout: {elapsed_time:.3f} seconds")
+                return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Budget ID not received"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            log.error(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+
+        
+        
+        
+    
+    
+
+
+
+
+        
+        
+        
+        

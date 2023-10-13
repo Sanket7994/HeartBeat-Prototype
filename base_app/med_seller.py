@@ -17,10 +17,11 @@ from django.http import HttpResponse
 from rest_framework.views import APIView, View
 from rest_framework.response import Response
 from .seller_SETTINGS import STRIPE_SECRET_KEY
-from .helper_functions import clean_payment_data, DecimalEncoder
+from .helper_functions import clean_payment_data, DecimalEncoder, DatetimeEncoder
 from django.template.loader import render_to_string
 from .models import PharmacyInventory, PurchaseOrder
 from .serializer import PurchaseOrderSerializer, PharmacyInventorySerializer
+from .choice_fields import *
 
 
 # This retrieves a Python logging instance (or creates it)
@@ -42,7 +43,7 @@ def verify_drug_class(input_string):
     if found_choice:
         return found_choice
     else:
-        return PharmacyInventory.GeneralDrugClass.OTHER
+        return GeneralDrugClass.OTHER
 
 
 # Generate random manufacturing date of products within 2 month range
@@ -92,38 +93,49 @@ def extract_product_data(product):
     return queryset
 
 
-# Now collecting price information
-def fetch_stripe_price_id(stripe_product_id):
+def fetch_seller_product_id(drug_name):
     try:
         # Checking seller's stripe db for product price id
         stripe.api_key = STRIPE_SECRET_KEY
-        queryset = stripe.Product.retrieve(stripe_product_id)
-        price_id = queryset["default_price"]
-        return price_id
-    
+        # List all products
+        products = stripe.Product.list(limit=100)
+        # Search for the product with the specified name
+        for product in products.data:
+            if product["name"] == drug_name:
+                seller_product_id = product["id"]
+                return seller_product_id
+            
     except stripe.error.InvalidRequestError as e:
-        try:
-            # Fetch hospital inventory to check if product exists there
-            stripe.api_key = settings.STRIPE_SECRET_KEY
-            queryset = stripe.Product.retrieve(stripe_product_id)
-            price_id = queryset["default_price"]
+        error_code = str(e)
+        return Response({"error": error_code}, status=status.HTTP_404_NOT_FOUND)
+            
+            
+# Now collecting price information  
+def fetch_stripe_price_id(drug_id=None, seller_product_id=None):
+    try:
+        stripe.api_key = STRIPE_SECRET_KEY
+
+        if seller_product_id:
+            product = stripe.Product.retrieve(seller_product_id)
+            price_id = product['default_price']
             return price_id
-        except stripe.error.InvalidRequestError as e2:
-            product_data = PharmacyInventory.objects.filter(drug_id=stripe_product_id).values().first()
+        elif drug_id:
+            product_data = PharmacyInventory.objects.filter(drug_id=drug_id).values('stripe_price_id').first()
+
             if product_data and product_data["stripe_price_id"]:
                 price_id = product_data["stripe_price_id"]
                 return price_id
             else:
-                error_code = str(e2)
-                return Response({"error": error_code}, status=status.HTTP_404_NOT_FOUND)
-        except ValueError as v2:
-                error_code = str(v2)
-                return Response({"error": error_code}, status=status.HTTP_404_NOT_FOUND)
-    except ValueError as v1:
-        error_code = str(v1)
-        return Response({"error": error_code}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"error": "Stripe price ID not found for the given drug ID"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({"error": "Either drug ID or seller product ID must be provided"}, status=status.HTTP_400_BAD_REQUEST)
+            
+    except stripe.error.InvalidRequestError as e2:
+        return Response({"error": str(e2)}, status=status.HTTP_404_NOT_FOUND)
+    except ValueError as v2:
+        return Response({"error": str(v2)}, status=status.HTTP_404_NOT_FOUND)
 
-        
+
 # Extract product and price information from stripe api response
 def filter_product_array(data):
     final_data = []
@@ -179,9 +191,9 @@ def create_PO_payment_link(po_data, return_items=False):
 
         line_items = []
         for product in order_data:
-            product_id = str(product["drugId"])
+            seller_product_id = str(product["seller_productId"])
             data = {
-                "price": fetch_stripe_price_id(product_id),
+                "price": fetch_stripe_price_id(None, seller_product_id),
                 "quantity": int(product["quantity"]),
             }
             line_items.append(data)
@@ -208,8 +220,6 @@ class FetchProducts(APIView):
 
     def get(self, request, *args, **kwargs):
         try:
-            # Recording API runtime
-            start_time = time.time()
             # Retrieve the current query param value from the request
             starting_after = self.request.GET.get("starting_after", None)
             page = int(self.request.GET.get("page", 1))
@@ -259,12 +269,6 @@ class FetchProducts(APIView):
                     "starting_after": starting_after,
                 },
             }
-
-            # Record the end time
-            end_time = time.time()
-            fetch_time = round((end_time - start_time), 3)
-            log.info(f"Fetched {len(extracted_data)} records in {fetch_time} seconds")
-
             return Response(response_data, status=status.HTTP_200_OK)
         except stripe.error.APIConnectionError as e:
             log.error(e)
@@ -379,7 +383,7 @@ def update_purchase_order_and_stock(request, purchase_order_id, cleaned_data):
                     "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                     }
             purchase_order.thread_history = validate_json_ops(purchase_order.thread_history, 
-                                                              new_thread, None)
+                                                              new_thread, DatetimeEncoder)
             # Saving the data to model
             purchase_order.save()
         else:
@@ -387,6 +391,8 @@ def update_purchase_order_and_stock(request, purchase_order_id, cleaned_data):
         order_data = json.loads(purchase_order.order)
         for product in order_data:
             try:
+                print(type(product))
+                print(product)
                 drug_data = PharmacyInventory.objects.select_for_update().get(drug_name=product["drugName"])
                 current_stock = drug_data.stock_available
                 quantity_added = int(product["quantity"])
@@ -399,7 +405,7 @@ def update_purchase_order_and_stock(request, purchase_order_id, cleaned_data):
                     "added_on": datetime.now().strftime("%d/%m/%Y %H:%M:%S"), 
                     "purchase_order_id": purchase_order_id
                 }
-                drug_data.stock_history = validate_json_ops(drug_data.stock_history, new_order, None)
+                drug_data.stock_history = validate_json_ops(drug_data.stock_history, new_order, DatetimeEncoder)
                 drug_data.save()
 
             except ObjectDoesNotExist:

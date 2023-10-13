@@ -2,23 +2,42 @@
 import uuid
 import stripe
 import json
+import random
 from collections import Counter
 from decimal import Decimal
 from django.db.models import Sum
 from django.utils import timezone
 from django.conf import settings
-from datetime import time, date, timedelta
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from django.db import models
 from django.contrib.auth.models import (
     AbstractBaseUser,
     BaseUserManager,
     PermissionsMixin,
 )
+from .choice_fields import (
+    ProcedureChoices,
+    StatusCode,
+    Country,
+    DosingFrequency,
+    EmployeeStatusCode,
+    StaffDesignation,
+    Shift_type,
+    Gender,
+    TaskStatusCode,
+    SetPriority,
+    TaskType,
+    LabelChoices,
+    DosageType,
+    GeneralDrugClass,
+    UnitType,
+    BudgetPeriodType,
+)
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ObjectDoesNotExist
 from phonenumber_field.modelfields import PhoneNumberField
 from django_resized import ResizedImageField
 from django.core.validators import URLValidator
@@ -108,18 +127,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
 # Clinic Model
 class Clinic(models.Model):
-    class StatusCode(models.TextChoices):
-        APPROVED = ("APPROVED", "Approved")
-        PENDING = ("PENDING", "Pending")
-        CANCELLED = ("CANCELLED", "Cancelled")
-
-    class Country(models.TextChoices):
-        UK = ("UK", "UNITED KINGDOM")
-        IN = ("IN", "INDIA")
-        US = ("US", "UNITED STATES OF AMERICA")
-        ES = ("ES", "SPAIN")
-        CN = ("CN", "CHINA")
-
     clinic_id = models.CharField(
         primary_key=True,
         max_length=50,
@@ -174,43 +181,9 @@ class Clinic(models.Model):
 
 # clinic Members
 class ClinicMember(models.Model):
-    class StatusCode(models.TextChoices):
-        APPROVED = ("APPROVED", "Approved")
-        PENDING = ("PENDING", "Pending")
-        CANCELLED = ("CANCELLED", "Cancelled")
-
-    class StaffDesignation(models.TextChoices):
-        IVF_COORDINATOR = "IVF_COORDINATOR", "IVF Coordinator"
-        DONOR_COORDINATOR = "DONOR_COORDINATOR", "Donor Coordinator"
-        RECEPTIONIST = "RECEPTIONIST", "Receptionist"
-        ADMIN = "ADMIN", "Admin"
-        DOCTOR_PHYSICIST = "DOCTOR_PHYSICIST", "Doctor/Physicist"
-        EMBRYOLOGY = "EMBRYOLOGY", "Embryology"
-        NURSE = "NURSE", "Nurse"
-        LABORATORY = "LABORATORY", "Laboratory"
-        PSYCHOLOGIST_COUNSELLOR = "PSYCHOLOGIST_COUNSELLOR", "Psychologist/Counsellor"
-
-    class Shift_type(models.TextChoices):
-        GENERAL_SHIFT = (
-            "General Shift 9AM - 6PM",
-            f"{time(9, 0).strftime('%I:%M %p')} - {time(18, 0).strftime('%I:%M %p')}",
-        )
-        FLEX_SHIFT_1 = (
-            "Flex Shift 10AM - 2PM",
-            f"{time(10, 0).strftime('%I:%M %p')} - {time(14, 0).strftime('%I:%M %p')}",
-        )
-        FLEX_SHIFT_2 = (
-            "Flex Shift 3PM - 7PM",
-            f"{time(15, 0).strftime('%I:%M %p')} - {time(19, 0).strftime('%I:%M %p')}",
-        )
-        FRONT_LINE_SHIFT_1 = (
-            "Front Line Shift 7AM - 7PM",
-            f"{time(7, 0).strftime('%I:%M %p')} - {time(19, 0).strftime('%I:%M %p')}",
-        )
-        FRONT_LINE_SHIFT_2 = (
-            "Front Line Shift 7PM - 7AM",
-            f"{time(19, 0).strftime('%I:%M %p')} - {time(7, 0).strftime('%I:%M %p')}",
-        )
+    def validate_date(value):
+        if value > timezone.now().date():
+            raise ValidationError(_("Invalid date."))
 
     staff_id = models.CharField(
         primary_key=True,
@@ -221,9 +194,18 @@ class ClinicMember(models.Model):
     clinic_name = models.ForeignKey(Clinic, on_delete=models.SET_NULL, null=True)
     staff_first_name = models.CharField(max_length=100, blank=False, null=False)
     staff_last_name = models.CharField(max_length=100, blank=False, null=False)
+    staff_gender = models.CharField(
+        max_length=100, choices=Gender.choices, default=None, null=True, blank=True
+    )
+    staff_date_of_birth = models.DateField(
+        validators=[validate_date],
+        default=None,
+        null=True,
+        blank=True,
+    )
+    staff_age = models.IntegerField(blank=True, null=True)
     staff_avatar = ResizedImageField(
         size=[150, 150],
-        default="avatar.jpg",
         upload_to="profile_avatars",
         blank=True,
         null=True,
@@ -241,8 +223,11 @@ class ClinicMember(models.Model):
         blank=True,
         validators=[RegexValidator(r"^(\+\d{1,3})?,?\s?\d{8,15}")],
     )
+    staff_fixed_salary = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     staff_status = models.CharField(
-        max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
+        max_length=100,
+        choices=EmployeeStatusCode.choices,
+        default=EmployeeStatusCode.INACTIVATE,
     )
     last_updated = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
@@ -251,12 +236,33 @@ class ClinicMember(models.Model):
         return f"{self.staff_id} : {self.staff_first_name} {self.staff_last_name}"
 
     def save(self, *args, **kwargs):
+        # Saving unique id
         if not self.staff_id:
             while True:
                 new_staff_id = str(uuid.uuid4().hex[:10].upper())
                 if not ClinicMember.objects.filter(staff_id=new_staff_id).exists():
                     self.staff_id = new_staff_id
                     break
+        # AUto calculate age after saving DOB
+        if self.staff_date_of_birth:
+            today = date.today()
+            staff_age = today.year - self.staff_date_of_birth.year
+
+            # Check if the birthday has already occurred this year
+            if today.month < self.staff_date_of_birth.month or (
+                today.month == self.staff_date_of_birth.month
+                and today.day < self.staff_date_of_birth.day
+            ):
+                staff_age -= 1
+            self.staff_age = staff_age
+
+        # Setting up default profile pictures
+        if self.staff_gender == Gender.MALE:
+            self.staff_avatar = "default-male-profile-pic.png"
+        elif self.staff_gender == Gender.FEMALE:
+            self.staff_avatar = "default-female-profile-pic.png"
+        elif self.staff_gender == Gender.UNDISCLOSED:
+            self.staff_avatar = "avatar.jpg"
         super().save(*args, **kwargs)
 
 
@@ -264,21 +270,6 @@ class ClinicMember(models.Model):
 class TaskAssignmentManager(models.Model):
     def default_json():
         return {}
-
-    class StatusCode(models.TextChoices):
-        COMPLETED = ("COMPLETED", "Completed")
-        PENDING = ("PENDING", "Pending")
-        POSTPONED = ("POSTPONED", "Postponed")
-        OVERDUE = ("OVERDUE", "Overdue")
-
-    class SetPriority(models.TextChoices):
-        HIGH = ("HIGH", "High")
-        MID = ("MID", "Mid")
-        LOW = ("LOW", "Low")
-
-    class TaskType(models.TextChoices):
-        GROUP = ("GROUP", "Group")
-        INDIVIDUAL = ("INDIVIDUAL", "Individual")
 
     task_id = models.CharField(
         primary_key=True,
@@ -290,7 +281,7 @@ class TaskAssignmentManager(models.Model):
     assignor = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True)
     department = models.CharField(
         max_length=100,
-        choices=ClinicMember.StaffDesignation.choices,
+        choices=StaffDesignation.choices,
         default=None,
         null=True,
     )
@@ -302,7 +293,7 @@ class TaskAssignmentManager(models.Model):
         max_length=100, choices=SetPriority.choices, default=SetPriority.LOW
     )
     task_status = models.CharField(
-        max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
+        max_length=100, choices=TaskStatusCode.choices, default=TaskStatusCode.PENDING
     )
     set_deadline = models.DateField(default=None, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -327,14 +318,6 @@ class PersonalJournal(models.Model):
     def default_json():
         return []
 
-    class LabelChoices(models.TextChoices):
-        PERSONAL = ("PERSONAL", "Personal")
-        WORK = ("WORK", "Work")
-        EVENT = ("EVENT", "Event")
-        REMINDER = ("REMINDER", "Reminder")
-        APPOINTMENT = ("APPOINTMENT", "Appointment")
-        IMPORTANT = ("IMPORTANT", "Important")
-
     note_id = models.IntegerField(
         primary_key=True, editable=False, unique=True, auto_created=True
     )
@@ -354,27 +337,29 @@ class PersonalJournal(models.Model):
 
 # Medical Procedures
 class MedicalProceduresTypes(models.Model):
-    class MyChoices(models.TextChoices):
-        MEDICAL_EXAMINATION = ("MEDICAL_EXAMINATION", "Medical Examination")
-        ROUTINE_CHECK_UP = ("ROUTINE_CHECK_UP", "Routine Check-up")
-        RESULT_ANALYSIS = ("RESULT_ANALYSIS", "Result Analysis")
-        BLOOD_TESTS = ("BLOOD_TESTS", "Blood Tests")
-        X_RAY = ("X_RAY", "X-ray")
-        ULTRASOUND = ("ULTRASOUND", "Ultrasound")
-        VACCINATIONS = ("VACCINATIONS", "Vaccinations")
-        BIOPSY = ("BIOPSY", "Biopsy")
-        SURGERY = ("SURGERY", "Surgery")
-        PHYSICAL_THERAPY = ("PHYSICAL_THERAPY", "Physical Therapy")
-        HEARING_TEST = ("HEARING_TEST", "Hearing Test")
-        VISION_TEST = ("VISION_TEST", "Vision Test")
-        CARDIAC_STRESS_TEST = ("CARDIAC_STRESS_TEST", "Cardiac Stress Test")
-        ORGAN_DONATION = ("ORGAN_DONATION", "Organ Donation")
-        CONSULTATION = ("CONSULTATION", "Consultation")
-        OTHER = ("OTHER", "Other")
-
     procedure_choice = models.CharField(
-        choices=MyChoices.choices, default=MyChoices.OTHER, max_length=154, unique=True
+        choices=ProcedureChoices.choices,
+        default=ProcedureChoices.MEDICAL_EXAMINATION,
+        max_length=154,
+        unique=True,
     )
+    stripe_service_id = models.CharField(max_length=256, blank=True, null=True)
+    stripe_service_price_id = models.CharField(max_length=256, blank=True, null=True)
+    fixed_cost = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    
+    def save(self, *args, **kwargs):
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        # Create Stripe product and price if IDs are not set
+        if not self.stripe_service_id:
+            service = stripe.Product.create(name=self.procedure_choice)
+            self.stripe_service_id = service.id
+
+        if not self.stripe_service_price_id:
+            price = stripe.Price.create(product=self.stripe_service_id, 
+                                        unit_amount=int(self.fixed_cost * 100), 
+                                        currency="usd")
+            self.stripe_service_price_id = price.id
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.procedure_choice
@@ -382,16 +367,6 @@ class MedicalProceduresTypes(models.Model):
 
 # Create appointments
 class PatientAppointment(models.Model):
-    class StatusCode(models.TextChoices):
-        APPROVED = "APPROVED", "Approved"
-        PENDING = "PENDING", "Pending"
-        CANCELLED = "CANCELLED", "Cancelled"
-
-    class Gender(models.TextChoices):
-        MALE = "MALE", "Male"
-        FEMALE = "FEMALE", "Female"
-        UNDISCLOSED = "UNDISCLOSED", "Undisclosed"
-
     def validate_date(value):
         if value < timezone.now().date():
             raise ValidationError(_("Invalid date."))
@@ -430,34 +405,48 @@ class PatientAppointment(models.Model):
     date_of_birth = models.DateField(blank=True, null=True)
     patient_age = models.IntegerField(blank=True, null=True)
     patient_email = models.EmailField(blank=True, null=True)
-    patient_contact_number = PhoneNumberField(
-        blank=True,
-        null=True,
-        validators=[RegexValidator(r"^(\+\d{1,3})?,?\s?\d{8,15}")],
-        default=None,
+    patient_contact_number = models.CharField(max_length=18, blank=True, null=True)
+    procedures = models.ManyToManyField(
+        MedicalProceduresTypes, related_name="procedure_choice_per_patient"
     )
-    recurring_patient = models.BooleanField(default=False)
-    procedures = models.ManyToManyField(MedicalProceduresTypes)
+    total_procedure_cost = models.DecimalField(
+        default=0, max_digits=10, decimal_places=2
+    )
     appointment_description = models.TextField(blank=True, null=True)
     appointment_date = models.DateField(
-        validators=[validate_date, validate_weekday],
+        # validators=[validate_date, validate_weekday],
         default=timezone.now,
     )
-    appointment_slot = models.CharField(blank=False, max_length=50)
+    appointment_slot = models.CharField(blank=False, max_length=50, null=True)
     appointment_status = models.CharField(
-        max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
+        max_length=100, choices=StatusCode.choices, default=None, blank=True, null=True
     )
+    recurring_patient = models.BooleanField(default=False)
+    patient_consent_agreement = models.BooleanField(default=False)
     last_updated = models.DateTimeField(auto_now=True)
-    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    created_at = models.DateTimeField()
+
+    def get_procedure_counts(self):
+        return Counter(item.procedure_choice for item in self.procedures.all())
+
+    def calculate_total_procedure_cost(self):
+        total_cost = Decimal("0.00")
+        for procedure in self.procedures.all():
+            procedure_data = (
+                MedicalProceduresTypes.objects.filter(procedure_choice=procedure)
+                .values("fixed_cost")
+                .first()
+            )
+            if procedure_data:
+                total_cost += Decimal(procedure_data["fixed_cost"])
+
+        return total_cost.quantize(Decimal("0.00"))
 
     def save(self, *args, **kwargs):
-        count_dict = {}
-
         if self.date_of_birth:
             today = date.today()
             patient_age = today.year - self.date_of_birth.year
 
-            # Check if the birthday has already occurred this year
             if today.month < self.date_of_birth.month or (
                 today.month == self.date_of_birth.month
                 and today.day < self.date_of_birth.day
@@ -465,7 +454,13 @@ class PatientAppointment(models.Model):
                 patient_age -= 1
             self.patient_age = patient_age
 
-        # Saving Appointment reference number
+        if self.relatedRecipient:
+            recipient_id = self.relatedRecipient.staff_id
+            recipient_data = (
+                ClinicMember.objects.filter(staff_id=recipient_id).values().first()
+            )
+            self.relatedDepartment = recipient_data["staff_designation"]
+
         if not self.appointment_id:
             while True:
                 new_appointment_id = str(uuid.uuid4().hex[:10].upper())
@@ -474,14 +469,11 @@ class PatientAppointment(models.Model):
                 ).exists():
                     self.appointment_id = new_appointment_id
                     break
+                
+        if self.procedures.exists():
+            self.total_procedure_cost = self.calculate_total_procedure_cost()
 
         super().save(*args, **kwargs)
-
-        if self.procedures.exists():
-            count_dict = Counter(
-                item.procedure_choice for item in self.procedures.all()
-            )
-            return count_dict
 
         # Check if patient exists in ClientDataCollectionPool
         # by checking their unique social security ID
@@ -502,34 +494,56 @@ class PatientAppointment(models.Model):
             client.client_contact_number = self.patient_contact_number
             client.client_email = self.patient_email
             client.appointment_count = 1
-            client.medical_procedure_history = count_dict
+            client.medical_procedure_history = self.get_procedure_counts()
             client.save()
         else:
             # Patient exists, update client contact fields
             client.client_contact_number = self.patient_contact_number
             client.client_email = self.patient_email
             # Increment appointment count If patient is recurring
-            client.appointment_count = int(client.appointment_count) + 1
+            client.appointment_count += 1
             # Update count of Medical procedures taken If patient is recurring
-            updated_medical_procedure_history = dict(
-                Counter(
-                    **client.medical_procedure_history,
-                    **self.procedures.values_list("procedure_choice", flat=True),
-                )
+            procedure_choices_qs = self.procedures.values_list(
+                "procedure_choice", flat=True
             )
-            client.medical_procedure_history = updated_medical_procedure_history
+            procedure_choices_list = list(procedure_choices_qs)
+            updated_medical_procedure_history = Counter(
+                client.medical_procedure_history
+            ) + Counter(procedure_choices_list)
+            client.medical_procedure_history = dict(updated_medical_procedure_history)
             client.save()
+
+    @classmethod
+    def get_total_procedure_amount(cls):
+        total_amount = PatientAppointment.objects.aggregate(total=Sum("total_procedure_cost"))
+        return round(total_amount["total"], 2) if total_amount["total"] else 0.00
 
     def __str__(self):
         return self.appointment_id
 
 
+def get_current_timestamp():
+    return timezone.now()
+
+
 # Address Validation and json defaults
-def validate_address(self, address):
+def validate_address(address):
     required_fields = ["country", "state", "city", "line1", "line2", "postal_code"]
-    for field in required_fields:
-        if field not in address:
-            address[field] = ""
+    if len(address) != 0:
+        for field in required_fields:
+            if field not in address:
+                address[field] = ""
+        return address
+    else:
+        address = {
+            "country": "",
+            "state": "",
+            "city": "",
+            "line1": "",
+            "line2": "",
+            "postal_code": "",
+        }
+        return address
 
 
 def default_address():
@@ -546,7 +560,7 @@ def default_address():
 # Auto update or create patient database
 class ClientDataCollectionPool(models.Model):
     def default_json_fields():
-        return dict
+        return list
 
     client_id = models.CharField(
         primary_key=True,
@@ -564,6 +578,12 @@ class ClientDataCollectionPool(models.Model):
     client_gender = models.CharField(max_length=10, default="UNDISCLOSED")
     client_contact_number = models.CharField(max_length=16, blank=True, null=True)
     client_email = models.EmailField(max_length=250, blank=True, null=True)
+    client_avatar = ResizedImageField(
+        size=[150, 150],
+        upload_to="profile_avatars",
+        blank=True,
+        null=True,
+    )
     client_shipping_address = models.JSONField(
         default=default_address, blank=True, null=True
     )
@@ -596,15 +616,31 @@ class ClientDataCollectionPool(models.Model):
                     break
 
         if self.client_shipping_address:
-            address = self.client_shipping_address
-            validate_address(self, address)
+            address = validate_address(self.client_shipping_address)
+            self.client_shipping_address = address
 
         if self.client_billing_address:
-            address = self.client_billing_address
-            validate_address(self, address)
+            address = validate_address(self.client_billing_address)
+            self.client_billing_address = address
 
+        if self.client_gender == "MALE":
+            self.client_avatar = "default-male-profile-pic.png"
+        elif self.client_gender == "FEMALE":
+            self.client_avatar = "default-female-profile-pic.png"
+        elif self.client_gender == "UNDISCLOSED":
+            self.client_avatar = "avatar.jpg"
         super().save(*args, **kwargs)
 
+    @classmethod
+    def get_data_by_gender(cls):
+        male_data = ClientDataCollectionPool.objects.filter(client_gender="MALE").values()
+        female_data = ClientDataCollectionPool.objects.filter(client_gender="FEMALE").values()
+        others = ClientDataCollectionPool.objects.filter(client_gender="UNDISCLOSED").values()
+        data = {"Male": len(male_data), 
+                "Female": len(female_data), 
+                "Other": len(others)}
+        return data
+    
     def __str__(self):
         return f"{self.client_id} : {self.client_first_name} {self.client_last_name}"
 
@@ -614,79 +650,13 @@ class PharmacyInventory(models.Model):
     def default_stock_history():
         return []
 
-    class DosageType(models.TextChoices):
-        ORAL = "ORAL", "Oral"
-        OPHTHALMIC = "OPHTHALMIC", "Ophthalmic"
-        INHALATION = "INHALATION", "Inhalation"
-        INJECTION = "INJECTION", "Injection"
-        TOPICAL = "TOPICAL", "Topical"
-        OTHER = "OTHER", "Other"
-
-    class GeneralDrugClass(models.TextChoices):
-        ANALGESICS = (
-            "ANALGESICS: Used for headaches, muscle pain, toothaches, menstrual pain",
-            "ANALGESICS",
-        )
-        ANTACIDS = (
-            "ANTACIDS: Used for heartburn, indigestion, acid reflux",
-            "ANTACIDS",
-        )
-        ANTIHISTAMINES = (
-            "ANTIHISTAMINES: Used for allergies, itchy skin or eyes, sneezing, runny nose",
-            "ANTIHISTAMINES",
-        )
-        COUGH_AND_COLD = (
-            "COUGH AND COLD: Used for cough relief, nasal congestion, sore throat",
-            "COUGH_AND_COLD",
-        )
-        TOPICAL_ANALGESICS = (
-            "TOPICAL ANALGESICS: Used for muscle aches and strains, joint pain, minor injuries",
-            "TOPICAL_ANALGESICS",
-        )
-        DERMATOLOGICAL = (
-            "DERMATOLOGICAL: Used for acne treatment, eczema or dermatitis management, fungal infections",
-            "DERMATOLOGICAL",
-        )
-        ORAL_CONTRACEPTIVES = (
-            "ORAL CONTRACEPTIVES: Used for pregnancy prevention",
-            "ORAL_CONTRACEPTIVES",
-        )
-        OPHTHALMIC = (
-            "OPHTHALMIC: Used for eye infections, dry eyes, allergic conjunctivitis",
-            "OPHTHALMIC",
-        )
-        TEST_KITS = (
-            "TEST KITS: Used as diagnostic tools to detect and analyze various medical conditions or substances.",
-            "TEST_KITS",
-        )
-        ANTIPYRETICS = (
-            "ANTIPYRETICS: Used to reduce fever", 
-            "ANTIPYRETICS"
-            )
-        ANTIDIARRHEALS = (
-            "ANTIDIARRHEALS: Used for diarrhea relief", 
-            "ANTIDIARRHEALS"
-            )
-        OTHER = (
-            "Other", 
-            "OTHER"
-            )
-
-    class UnitType(models.TextChoices):
-        SINGLE_UNIT = "SINGLE_UNIT", "Single Unit"
-        PACK_OF_10 = "PACK_OF_10", "Pack of 10"
-        PACK_OF_50 = "PACK_OF_50", "Pack of 50"
-
     drug_id = models.CharField(
         primary_key=True,
         max_length=50,
         editable=False,
         unique=True,
     )
-
-    stripe_product_id = models.CharField(
-        max_length=255, blank=True, null=True, editable=False
-    )
+    stripe_product_id = models.CharField(max_length=255, blank=True, null=True)
     drug_name = models.CharField(max_length=250, unique=True)
     drug_image_url = models.TextField(
         validators=[URLValidator()], blank=True, null=True
@@ -717,7 +687,7 @@ class PharmacyInventory(models.Model):
     )
     price = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     stripe_price_id = models.CharField(
-        max_length=255, blank=True, null=True, editable=False
+        max_length=255, blank=True, null=True
     )
     add_new_stock = models.PositiveIntegerField(default=0, help_text="add_quantity")
     stock_available = models.PositiveIntegerField(
@@ -768,7 +738,7 @@ class PharmacyInventory(models.Model):
 
     @staticmethod
     def get_drug_class_choices():
-        choice_list = [choice for choice in PharmacyInventory.GeneralDrugClass.choices]
+        choice_list = [choice for choice in GeneralDrugClass.choices]
         return choice_list
 
     def __str__(self):
@@ -790,11 +760,6 @@ class PurchaseOrder(models.Model):
     def default_thread():
         return []
 
-    class StatusCode(models.TextChoices):
-        APPROVED = "APPROVED", "Approved"
-        PENDING = "PENDING", "Pending"
-        REJECTED = "REJECTED", "Rejected"
-
     purchase_order_id = models.CharField(
         primary_key=True,
         max_length=20,
@@ -814,7 +779,7 @@ class PurchaseOrder(models.Model):
     )
     thread_history = models.JSONField(default=default_thread, null=True, blank=True)
     transaction_data = models.JSONField(default=default_thread, null=True, blank=True)
-    payment_status = models.CharField(max_length=250, default="Unpaid")
+    payment_status = models.CharField(max_length=250, default="UNPAID")
     approval_status = models.CharField(
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
@@ -855,17 +820,6 @@ class POPayment(models.Model):
 
 # Prescription Model
 class Prescription(models.Model):
-    class StatusCode(models.TextChoices):
-        APPROVED = "APPROVED", "Approved"
-        PENDING = "PENDING", "Pending"
-        CANCELLED = "CANCELLED", "Cancelled"
-
-    class DosingFrequency(models.TextChoices):
-        ONCE_A_DAY = "ONCE_A_DAY", "Once a day"
-        TWICE_A_DAY = "TWICE_A_DAY", "Twice a day"
-        THRICE_A_DAY = "THRICE_A_DAY", "Thrice a day"
-        FLEXIBLE = "FLEXIBLE", "Flexible timings"
-
     def default_json_fields():
         return dict
 
@@ -875,24 +829,14 @@ class Prescription(models.Model):
         editable=False,
         unique=True,
     )
-    clinic_name = models.ForeignKey(
-        Clinic,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="prescriptions",
-    )
-    consultant = models.ForeignKey(
-        ClinicMember,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="prescriptions",
-    )
     appointment_id = models.ForeignKey(
         PatientAppointment,
         on_delete=models.SET_NULL,
         null=True,
         related_name="prescriptions",
     )
+    clinic_name = models.CharField(max_length=250, default=None, null=True, blank=True)
+    consultant = models.CharField(max_length=250, default=None, null=True, blank=True)
     medications_json = models.JSONField(
         default=default_json_fields(), blank=True, null=True
     )
@@ -919,23 +863,34 @@ class Prescription(models.Model):
         max_length=100, choices=StatusCode.choices, default=StatusCode.PENDING
     )
     payment_status = models.CharField(max_length=100, default="UNPAID")
-    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    created_at = models.DateTimeField()
 
     def save(self, *args, **kwargs):
+        total_procedure_cost = Decimal(0)
+        total_med_amount = Decimal(0)
+        
+        if self.appointment_id:
+            appointment_data = (
+                PatientAppointment.objects.filter(appointment_id=self.appointment_id)
+                .values()
+                .first()
+            )
+            self.clinic_name = appointment_data["clinic_name_id"]
+            self.consultant = appointment_data["relatedRecipient_id"]
+            total_procedure_cost += appointment_data["total_procedure_cost"]
+
         if self.medications_json:
             medications = json.loads(self.medications_json)
-
-            total_med_amount = Decimal(0)
             for medicine in medications:
                 total_payable_amount = Decimal(medicine["total_payable_amount"])
                 total_med_amount += total_payable_amount
-
+            
             # Adding appointment charge
             self.appointment_fee = Decimal("100.00")
             self.med_bill_amount = total_med_amount
-            self.grand_total = (
-                self.med_bill_amount + self.appointment_fee
-            ) - self.coupon_discount
+            self.grand_total = (self.med_bill_amount + 
+                                self.appointment_fee + 
+                                total_procedure_cost) - self.coupon_discount
 
             try:
                 with transaction.atomic():
@@ -961,8 +916,7 @@ class Prescription(models.Model):
                             medicine_load[medicine_id] = quantity
                     else:
                         medicine_load = {}
-
-                    client.prescription_count += 1
+                        
                     updated_medication_history = {
                         **client.medication_history,
                         **medicine_load,
@@ -972,8 +926,8 @@ class Prescription(models.Model):
                     client.stripe_customer_id = self.stripe_client_id
                     client.save()
 
-            except ClientDataCollectionPool.DoesNotExist:
-                return "Client Data doesn't exist. Client must be seen by a physician/doctor before receiving a prescription"
+            except Exception as e:
+                return str(e)
 
         # Checking if UID exists
         if not self.prescription_id:
@@ -997,9 +951,70 @@ class Prescription(models.Model):
 
     @classmethod
     def get_total_due_amount(cls):
-        total_due = Prescription.objects.aggregate(total=Sum("grand_total"))
+        total_due = Prescription.objects.aggregate(total=Sum("med_bill_amount"))
         return round(total_due["total"], 2) if total_due["total"] else 0.00
-
+    
+    @classmethod
+    def total_patients_treated(cls):
+        prescriptions = Prescription.objects.all()
+        treatedPatientCount = 0
+        for prescription in prescriptions:
+            if prescription.payment_status == "PAID":
+                treatedPatientCount += 1
+        return treatedPatientCount
+    
+    @classmethod
+    def get_customer_data(cls, prescription_id):
+        prescription_data = Prescription.objects.filter(prescription_id=prescription_id).values().first()
+        appointment_data = PatientAppointment.objects.filter(appointment_id=prescription_data["appointment_id_id"]
+                                                             ).values().first()
+        return appointment_data["patient_gender"]
+    
+    @classmethod
+    def get_total_unique_active_patients_with_age_gender_distribution(cls):
+        prescriptions = Prescription.objects.all()
+        totalActivePatients = []
+        child = 0
+        teenage = 0
+        adult = 0
+        male = 0
+        female = 0
+        undisclosed = 0
+        # Active patients will be those whose are undergoing treatment
+        # and have given prescription 
+        # (*Only appointments will be not considered active)
+        for prescription in prescriptions:
+            if prescription.appointment_id:
+                appointment_id = prescription.appointment_id
+                appointment_data = PatientAppointment.objects.filter(appointment_id=appointment_id).values().first()
+                if appointment_data["patient_social_security_ID"] not in totalActivePatients:
+                    totalActivePatients.append(appointment_data["patient_social_security_ID"])
+                    if appointment_data["patient_age"]:
+                        if appointment_data["patient_age"] >= 0 and appointment_data["patient_age"] <= 13:
+                            child += 1
+                        elif appointment_data["patient_age"] >= 14 and appointment_data["patient_age"] <= 18:
+                            teenage += 1
+                        else:
+                            adult += 1
+                    if appointment_data["patient_gender"]:
+                        if appointment_data["patient_gender"] == "MALE":
+                            male += 1
+                        elif appointment_data["patient_gender"] == "FEMALE":
+                            female += 1
+                        else:
+                            undisclosed += 1
+                        
+        totalUniqueActivePatients = len(set(totalActivePatients))
+        metadata = {"Children_distribution": round((child/totalUniqueActivePatients), 2), 
+                    "Teenagers_distribution": round((teenage/totalUniqueActivePatients), 2), 
+                    "Adults_distribution": round((adult/totalUniqueActivePatients), 2),
+                    "Male_distribution": round((male/totalUniqueActivePatients), 2),
+                    "Female_distribution": round((female/totalUniqueActivePatients), 2),
+                    "Undisclosed_distribution": round((undisclosed/totalUniqueActivePatients), 2),
+                    "total_unique_active_patients": totalUniqueActivePatients}
+        return metadata
+    
+    
     def __str__(self):
         return str(self.prescription_id)
 
@@ -1013,3 +1028,70 @@ class ClientServiceFeedback(models.Model):
 
     def __str__(self):
         return f"ID: {self.id} - {self.created_at} - {self.comment[:15]}..."
+
+
+# Create Budget for the time period
+class FinancialBudget(models.Model):
+    budget_id = models.CharField(
+        primary_key=True, max_length=50, editable=False, unique=True, default=None
+    )
+    created_by = models.CharField(max_length=100)
+    budget_title = models.CharField(max_length=250, blank=True, null=True)
+    budget_period_type = models.CharField(
+        max_length=100,
+        choices=BudgetPeriodType.choices,
+        default=BudgetPeriodType.MONTHLY,
+    )
+    start_date = models.DateField(default=date.today)
+    end_date = models.DateField(default=date.today)
+    set_amount = models.DecimalField(default=150000, max_digits=10, decimal_places=2)
+    approved_by = models.CharField(max_length=100, default=None, null=True, blank=True)
+    evaluation_status = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        # Checking if UID exists
+        if not self.budget_id:
+            while True:
+                new_budget_id = str("B-" + str(uuid.uuid4().hex[:5].upper()))
+                if not FinancialBudget.objects.filter(budget_id=new_budget_id).exists():
+                    self.budget_id = new_budget_id
+                    break
+
+        # Assigning the budget timeline
+        if self.budget_period_type == BudgetPeriodType.YEARLY:
+            self.start_date = date(self.start_date.year, 1, 1)
+            self.end_date = date(self.start_date.year, 12, 31)
+        elif self.budget_period_type == BudgetPeriodType.QUARTERLY:
+            quarter_start = (self.start_date.month - 1) // 3 * 3 + 1
+            self.start_date = date(self.start_date.year, quarter_start, 1)
+            self.end_date = date(
+                self.start_date.year, quarter_start + 2, 1
+            ) + timedelta(days=89)
+        elif self.budget_period_type == BudgetPeriodType.MONTHLY:
+            self.start_date = date(self.start_date.year, self.start_date.month, 1)
+            if self.start_date.month == 12:
+                self.end_date = date(self.start_date.year + 1, 1, 1) - timedelta(days=1)
+            else:
+                self.end_date = date(
+                    self.start_date.year, self.start_date.month + 1, 1
+                ) - timedelta(days=1)
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.budget_id} - {self.budget_title}"
+
+
+# Purely for creating dummy donation data
+class Donations(models.Model):
+    donor = models.CharField(max_length=250, null=True, blank=True)
+    donation_date = models.DateTimeField()
+    donation_amount = models.PositiveIntegerField(default=0)
+    
+    def __str__(self):
+        return f"{self.donor} - {self.donation_amount}"
+    
+
+
+    
+

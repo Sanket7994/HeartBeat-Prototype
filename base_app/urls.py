@@ -6,7 +6,7 @@ from .views import *
 
 #seller view
 from .med_seller import FetchProducts, PurchaseOrderCheckoutSession, SuccessPOPaymentView, CancelPOPaymentView
-
+from .UploadFakeDataToDB import FakeDataGenerator
 
 urlpatterns = [
     path('ping/', PingTest.as_view(), name='check-ping'),
@@ -54,12 +54,13 @@ urlpatterns = [
     path('clinic/scheduler/appointments/prescription/view/', PrescriptionManagement.as_view(), name='view-prescription'),
     
     path('prescription/fetch/appointment_id=<str:appointment_id>&prescription_id=<str:prescription_id>', FetchPrescriptReceipt.as_view(), name='upload-prescription'),
-    path('finance/change-currency/current_selected_currency=<str:current_selected_currency>&target_currency=<str:target_currency>', helper_functions.get_currency_exchange_rates),
-    path('finance/view-customer-feedback/', CustomerFeedbackView.as_view(), name='view-customer-feedback'),
-    
+
     path('config/', views.stripe_config, name='share-key'),
     path('payment/create-checkout-session/<str:prescription_id>/', PrescriptionPaymentCheckoutSessionView.as_view(), name='create-checkout-session'),
+    
     path('payment/success', SuccessPaymentView.as_view(), name='success-payment-view'),
+    
+    
     path('payment/success/get-customer-feedback/', CustomerFeedbackView.as_view(), name='customer-feedback'),
     path('payment/cancel', CancelPaymentView.as_view(), name='cancel-payment-view'),    
     
@@ -84,7 +85,21 @@ urlpatterns = [
     path('<str:purchase_order_id>/payment/success', SuccessPOPaymentView.as_view(), name='success-payment-view'),
     path('<str:purchase_order_id>/payment/cancel', CancelPOPaymentView.as_view(), name='cancel-payment-view'),    
     
+    #Financial planning and evaluated data
+    path('budget-plan/create', FinancialBudgetView.as_view(), name='budget-plan-create'), 
+    path('budget-plan/view', FinancialBudgetView.as_view(), name='budget-plan-view'), 
+    
+    path('finance/create', BudgetEvaluation.as_view(), name='finance-analysis-create'), 
+    path('finance/view/budget_id=<str:budget_id>/', BudgetEvaluation.as_view(), name='finance-analysis-view'),
+    path('finance/change-currency/current_selected_currency=<str:current_selected_currency>&target_currency=<str:target_currency>', 
+         helper_functions.get_currency_exchange_rates),
+    path('finance/view-customer-feedback/', CustomerFeedbackView.as_view(), name='view-customer-feedback'),
+    
+    #Generate fake data
+    path('fake/prescription', FakeDataGenerator.as_view(), name='create-fake-prescription'),  
+    
 ]
+
 
 
 
